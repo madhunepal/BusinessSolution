@@ -1,0 +1,122 @@
+@page "/appointments/create/{JobId:guid}"
+@using System.ComponentModel.DataAnnotations
+@using SmallBusiness.Application.DTOs.Appointments
+@using SmallBusiness.Application.Interfaces
+@inject IAppointmentService AppointmentService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Schedule Appointment</PageTitle>
+
+<div class="mb-4">
+    <a href="/jobs/@JobId" class="btn btn-outline-secondary">&larr; Back to Job</a>
+</div>
+
+<h1>Schedule Appointment</h1>
+
+<div class="card">
+    <div class="card-body">
+        <EditForm Model="_request" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+            
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger">@_errorMessage</div>
+            }
+            
+            @if (!string.IsNullOrEmpty(_warningMessage))
+            {
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> @_warningMessage
+                    <div class="mt-2">
+                        <div class="form-check">
+                            <InputCheckbox @bind-Value="_ignoreConflicts" class="form-check-input" id="ignoreConflicts" />
+                            <label class="form-check-label" for="ignoreConflicts">
+                                Proceed and ignore conflicts
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Start Time</label>
+                    <input type="datetime-local" class="form-control" @bind="_localStart" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">End Time</label>
+                    <input type="datetime-local" class="form-control" @bind="_localEnd" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Notes for Technician (Optional)</label>
+                <InputTextArea @bind-Value="_request.Notes" class="form-control" rows="3" />
+                <ValidationMessage For="@(() => _request.Notes)" class="text-danger" />
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                    @if (_isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span> Scheduling...</span>
+                    }
+                    else
+                    {
+                        <span>Schedule Appointment</span>
+                    }
+                </button>
+                <a href="/jobs/@JobId" class="btn btn-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid JobId { get; set; }
+
+    private CreateAppointmentRequest _request = new();
+    private DateTime _localStart = DateTime.Now.Date.AddHours(9);
+    private DateTime _localEnd = DateTime.Now.Date.AddHours(11);
+    
+    private bool _isSubmitting = false;
+    private string? _errorMessage;
+    private string? _warningMessage;
+    private bool _ignoreConflicts = false;
+
+    protected override void OnInitialized()
+    {
+        _request.JobId = JobId;
+    }
+
+    private async Task HandleSubmit()
+    {
+        try
+        {
+            _isSubmitting = true;
+            _errorMessage = null;
+            _warningMessage = null;
+
+            // Simple conversion from local datetime to DateTimeOffset (Assuming server/local timezone for V1)
+            _request.Start = new DateTimeOffset(_localStart);
+            _request.End = new DateTimeOffset(_localEnd);
+
+            var appointmentId = await AppointmentService.CreateAppointmentAsync(_request, _ignoreConflicts);
+            NavigationManager.NavigateTo($"/appointments/{appointmentId}");
+        }
+        catch (ValidationException ex) when (ex.Message.StartsWith("SCHEDULING_CONFLICT:"))
+        {
+            _warningMessage = ex.Message.Replace("SCHEDULING_CONFLICT:", "").Trim();
+            _isSubmitting = false;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _isSubmitting = false;
+        }
+    }
+}

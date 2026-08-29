@@ -1,0 +1,337 @@
+@page "/jobs/{Id:guid}"
+@using SmallBusiness.Application.DTOs.Jobs
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Domain.Enums
+@inject IJobService JobService
+@inject IAppointmentService AppointmentService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Job Details</PageTitle>
+
+<div class="mb-4">
+    <a href="/jobs" class="btn btn-outline-secondary">&larr; Back to Jobs</a>
+</div>
+
+@if (_job == null)
+{
+    <p><em>Loading...</em></p>
+    if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>@_job.JobNumber</h1>
+        <div>
+            @if (_job.Status == JobStatus.Draft || _job.Status == JobStatus.Ready || _job.Status == JobStatus.InProgress)
+            {
+                <a href="/jobs/edit/@Id" class="btn btn-outline-primary">Edit Job</a>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Job Overview</h5>
+                </div>
+                <div class="card-body">
+                    <h3 class="card-title">@_job.Title</h3>
+                    <p class="card-text">@_job.Description</p>
+                    <hr />
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <strong>Status:</strong> 
+                            <span class="badge @GetStatusBadgeClass(_job.Status)">@_job.Status</span>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Priority:</strong> 
+                            <span class="badge @GetPriorityBadgeClass(_job.Priority)">@_job.Priority</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Tasks</h5>
+                    <span class="badge bg-secondary">@_job.Tasks.Count(t => t.IsCompleted) / @_job.Tasks.Count Completed</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @if (!_job.Tasks.Any())
+                    {
+                        <li class="list-group-item text-muted">No tasks defined.</li>
+                    }
+                    else
+                    {
+                        @foreach (var task in _job.Tasks.OrderBy(t => t.SortOrder))
+                        {
+                            <li class="list-group-item">
+                                <div class="d-flex align-items-center">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" checked="@task.IsCompleted" disabled>
+                                        <label class="form-check-label @(task.IsCompleted ? "text-decoration-line-through text-muted" : "")">
+                                            @task.Description
+                                        </label>
+                                    </div>
+                                    @if (task.CompletedAt.HasValue)
+                                    {
+                                        <small class="ms-auto text-muted">@task.CompletedAt.Value.ToLocalTime().ToString("g")</small>
+                                    }
+                                </div>
+                            </li>
+                        }
+                    }
+                </ul>
+            </div>
+            
+            @if (_job.Status == JobStatus.Completed || _job.Status == JobStatus.Cancelled)
+            {
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Completion Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>@(_job.CompletionNotes ?? "No notes provided.")</p>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Customer & Location</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Customer</h6>
+                    <p class="mb-1"><strong>@_job.CustomerNameSnapshot</strong></p>
+                    <p class="mb-1"><a href="mailto:@_job.CustomerEmailSnapshot">@_job.CustomerEmailSnapshot</a></p>
+                    <p class="mb-3"><a href="tel:@_job.CustomerPhoneSnapshot">@_job.CustomerPhoneSnapshot</a></p>
+                    
+                    <h6 class="card-subtitle mb-2 text-muted">Service Address</h6>
+                    <address class="mb-1">
+                        @if (!string.IsNullOrWhiteSpace(_job.ServiceStreet))
+                        {
+                            @_job.ServiceStreet<br>
+                            @($"{_job.ServiceCity}, {_job.ServiceState} {_job.ServicePostalCode}".Trim(',').Trim())<br>
+                            @_job.ServiceCountry
+                        }
+                        else
+                        {
+                            <span class="text-muted">No address provided</span>
+                        }
+                    </address>
+                    
+                    @if (!string.IsNullOrWhiteSpace(_job.AccessInstructions))
+                    {
+                        <div class="alert alert-info py-2 mt-3 mb-0">
+                            <strong>Access:</strong> @_job.AccessInstructions
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Workflow</h5>
+                </div>
+                <div class="card-body">
+                    @if (_job.SalesOrderId.HasValue)
+                    {
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-1">Source Sales Order</h6>
+                            <a href="/sales-orders/@_job.SalesOrderId" class="btn btn-sm btn-outline-primary w-100">View Sales Order</a>
+                        </div>
+                        <hr />
+                    }
+
+                    <div class="d-grid gap-2">
+                        @if (_job.Status == JobStatus.Draft)
+                        {
+                            <button class="btn btn-info text-white" @onclick="() => ChangeStatus(JobStatus.Ready)">Mark as Ready</button>
+                            <button class="btn btn-outline-danger" @onclick="ShowCancelModal">Cancel Job</button>
+                        }
+                        else if (_job.Status == JobStatus.Ready)
+                        {
+                            <button class="btn btn-primary" @onclick="() => ChangeStatus(JobStatus.InProgress)">Start Job (In Progress)</button>
+                            <button class="btn btn-outline-danger" @onclick="ShowCancelModal">Cancel Job</button>
+                        }
+                        else if (_job.Status == JobStatus.InProgress)
+                        {
+                            <button class="btn btn-success" @onclick="ShowCompleteModal">Complete Job</button>
+                            <button class="btn btn-outline-danger" @onclick="ShowCancelModal">Cancel Job</button>
+                        }
+                    </div>
+                </div>
+                <ul class="list-group list-group-flush">
+                    @if (_job.ReadyAt.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <small class="text-muted">Ready:</small>
+                            <small>@_job.ReadyAt.Value.ToLocalTime().ToString("g")</small>
+                        </li>
+                    }
+                    @if (_job.ActualStartDate.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <small class="text-muted">Started:</small>
+                            <small>@_job.ActualStartDate.Value.ToLocalTime().ToString("g")</small>
+                        </li>
+                    }
+                    @if (_job.ActualEndDate.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between">
+                            <small class="text-muted">Completed:</small>
+                            <small>@_job.ActualEndDate.Value.ToLocalTime().ToString("g")</small>
+                        </li>
+                    }
+                    @if (_job.CancelledAt.HasValue)
+                    {
+                        <li class="list-group-item d-flex justify-content-between text-danger">
+                            <small>Cancelled:</small>
+                            <small>@_job.CancelledAt.Value.ToLocalTime().ToString("g")</small>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showNotesModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_targetStatus == JobStatus.Completed ? "Complete Job" : "Cancel Job")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Notes (Optional)</label>
+                        <textarea class="form-control" rows="3" @bind="_completionNotes"></textarea>
+                    </div>
+                    @if (_targetStatus == JobStatus.Completed && _job?.SalesOrderId != null)
+                    {
+                        <div class="alert alert-info">
+                            Completing this job will automatically complete the associated Sales Order if it is currently Confirmed.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                    <button type="button" class="btn @(_targetStatus == JobStatus.Completed ? "btn-success" : "btn-danger")" @onclick="ConfirmStatusChange">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private JobDto? _job;
+    private string? _errorMessage;
+    
+    private bool _showNotesModal = false;
+    private JobStatus _targetStatus;
+    private string? _completionNotes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJob();
+    }
+
+    private async Task LoadJob()
+    {
+        try
+        {
+            _job = await JobService.GetJobAsync(Id);
+            _errorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Could not load job: " + ex.Message;
+        }
+    }
+
+    private async Task ChangeStatus(JobStatus newStatus)
+    {
+        try
+        {
+            await JobService.ChangeJobStatusAsync(Id, newStatus);
+            await LoadJob();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void ShowCompleteModal()
+    {
+        _targetStatus = JobStatus.Completed;
+        _completionNotes = "";
+        _showNotesModal = true;
+    }
+
+    private void ShowCancelModal()
+    {
+        _targetStatus = JobStatus.Cancelled;
+        _completionNotes = "";
+        _showNotesModal = true;
+    }
+
+    private void CloseModal()
+    {
+        _showNotesModal = false;
+    }
+
+    private async Task ConfirmStatusChange()
+    {
+        try
+        {
+            await JobService.ChangeJobStatusAsync(Id, _targetStatus, _completionNotes);
+            _showNotesModal = false;
+            await LoadJob();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _showNotesModal = false;
+        }
+    }
+
+    private string GetStatusBadgeClass(JobStatus status) => status switch
+    {
+        JobStatus.Draft => "bg-secondary",
+        JobStatus.Ready => "bg-info",
+        JobStatus.InProgress => "bg-primary",
+        JobStatus.Completed => "bg-success",
+        JobStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityBadgeClass(JobPriority priority) => priority switch
+    {
+        JobPriority.Low => "bg-secondary text-dark",
+        JobPriority.Normal => "bg-primary",
+        JobPriority.High => "bg-warning text-dark",
+        JobPriority.Urgent => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

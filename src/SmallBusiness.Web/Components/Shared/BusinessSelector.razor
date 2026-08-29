@@ -1,0 +1,159 @@
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Identity
+@using SmallBusiness.Infrastructure.Identity
+@using SmallBusiness.Application.Interfaces
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IApplicationDbContext DbContext
+@inject ITenantContext TenantContext
+@inject NavigationManager NavigationManager
+
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-warning">
+        <h5 class="mb-0">Select or Create a Business</h5>
+    </div>
+    <div class="card-body">
+        @if (_isLoading)
+        {
+            <p>Loading your businesses...</p>
+        }
+        else if (_userBusinesses.Any())
+        {
+            <p>You have access to the following businesses. Please select one to continue:</p>
+            <div class="list-group mb-4">
+                @foreach (var bu in _userBusinesses)
+                {
+                    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" @onclick="() => SelectBusinessAsync(bu.BusinessId)">
+                        <span>
+                            <strong>@bu.Business.Name</strong> 
+                            <span class="badge bg-secondary ms-2">Role: @bu.Role</span>
+                        </span>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                }
+            </div>
+        }
+        else
+        {
+            <p>You do not belong to any business yet.</p>
+        }
+
+        <hr />
+        
+        <h6>Create a New Business</h6>
+        <form @onsubmit="CreateBusinessAsync" class="d-flex gap-2">
+            <input type="text" class="form-control" placeholder="Business Name" @bind="_newBusinessName" required />
+            <button type="submit" class="btn btn-success">Create</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private List<SmallBusiness.Domain.Entities.BusinessUser> _userBusinesses = new();
+    private string _newBusinessName = "";
+    
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBusinessesAsync();
+    }
+
+    private async Task LoadBusinessesAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            if (AuthState != null)
+            {
+                var state = await AuthState;
+                var userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (userId != null)
+                {
+                    // Use IgnoreQueryFilters because the global query filter currently filters by CurrentBusinessId
+                    // and we need to find businesses the user belongs to REGARDLESS of current active context.
+                    _userBusinesses = await DbContext.BusinessUsers
+                        .IgnoreQueryFilters()
+                        .Include(bu => bu.Business)
+                        .Where(bu => bu.UserId == userId)
+                        .ToListAsync();
+                }
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SelectBusinessAsync(Guid businessId)
+    {
+        if (AuthState != null)
+        {
+            var state = await AuthState;
+            var user = await UserManager.GetUserAsync(state.User);
+            if (user != null)
+            {
+                // Verify the user actually belongs to this business
+                var hasAccess = await DbContext.BusinessUsers
+                    .IgnoreQueryFilters()
+                    .AnyAsync(bu => bu.BusinessId == businessId && bu.UserId == user.Id);
+                    
+                if (hasAccess)
+                {
+                    // Add/update claim
+                    var claims = await UserManager.GetClaimsAsync(user);
+                    var existingClaim = claims.FirstOrDefault(c => c.Type == "BusinessId");
+                    if (existingClaim != null)
+                    {
+                        await UserManager.RemoveClaimAsync(user, existingClaim);
+                    }
+                    await UserManager.AddClaimAsync(user, new Claim("BusinessId", businessId.ToString()));
+                    
+                    // Refresh sign in to update the auth cookie
+                    await SignInManager.RefreshSignInAsync(user);
+                    
+                    // Reload the page to apply context
+                    NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+                }
+            }
+        }
+    }
+
+    private async Task CreateBusinessAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newBusinessName)) return;
+        
+        if (AuthState != null)
+        {
+            var state = await AuthState;
+            var userId = state.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId != null)
+            {
+                var newBusiness = new SmallBusiness.Domain.Entities.Business
+                {
+                    Id = Guid.NewGuid(),
+                    Name = _newBusinessName
+                };
+                
+                var bu = new SmallBusiness.Domain.Entities.BusinessUser
+                {
+                    BusinessId = newBusiness.Id,
+                    UserId = userId,
+                    Role = "Owner",
+                };
+                
+                DbContext.Businesses.Add(newBusiness);
+                DbContext.BusinessUsers.Add(bu);
+                await DbContext.SaveChangesAsync(default);
+                
+                await SelectBusinessAsync(newBusiness.Id);
+            }
+        }
+    }
+}

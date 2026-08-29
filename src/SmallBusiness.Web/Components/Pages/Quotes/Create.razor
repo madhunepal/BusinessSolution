@@ -1,0 +1,333 @@
+@page "/quotes/create"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.Quotes
+@using SmallBusiness.Application.DTOs.Customers
+@using SmallBusiness.Application.DTOs.CatalogItems
+@inject IQuoteService QuoteService
+@inject ICustomerService CustomerService
+@inject ICatalogItemService CatalogItemService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>New Quote — SBMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>New Quote</h1>
+    <a href="/quotes" class="btn btn-outline-secondary">Cancel</a>
+</div>
+
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    @if (_errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
+
+    <EditForm Model="@_request" OnValidSubmit="HandleValidSubmitAsync">
+        <DataAnnotationsValidator />
+
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Quote Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Customer <span class="text-danger">*</span></label>
+                            <InputSelect @bind-Value="_request.CustomerId" class="form-select">
+                                <option value="">Select a Customer...</option>
+                                @foreach (var customer in _customers)
+                                {
+                                    <option value="@customer.Id">@customer.Name (@customer.CustomerNumber)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => _request.CustomerId)" class="text-danger" />
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Quote Date <span class="text-danger">*</span></label>
+                                <InputDate @bind-Value="_request.QuoteDate" class="form-control" />
+                                <ValidationMessage For="@(() => _request.QuoteDate)" class="text-danger" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Expiration Date</label>
+                                <InputDate @bind-Value="_request.ExpirationDate" class="form-control" />
+                                <ValidationMessage For="@(() => _request.ExpirationDate)" class="text-danger" />
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Notes</label>
+                            <InputTextArea @bind-Value="_request.Notes" class="form-control" rows="3" />
+                            <ValidationMessage For="@(() => _request.Notes)" class="text-danger" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Line Items</h5>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddManualLine">
+                                <i class="bi bi-plus"></i> Manual Line
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="p-3 border-bottom bg-light">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-md-8">
+                                    <select class="form-select form-select-sm" @bind="_selectedCatalogItemId">
+                                        <option value="">Select an item from catalog to add...</option>
+                                        @foreach (var item in _catalogItems)
+                                        {
+                                            <option value="@item.Id">@item.ItemCode - @item.Name (@item.SellingPrice.ToString("C"))</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="button" class="btn btn-sm btn-primary w-100" @onclick="AddCatalogLine" disabled="@(string.IsNullOrEmpty(_selectedCatalogItemId))">
+                                        Add to Quote
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-borderless mb-0">
+                                <thead class="table-light border-bottom">
+                                    <tr>
+                                        <th style="width: 35%">Description</th>
+                                        <th style="width: 15%">Qty</th>
+                                        <th style="width: 15%">Unit</th>
+                                        <th style="width: 15%">Price</th>
+                                        <th style="width: 10%">Tax</th>
+                                        <th style="width: 10%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (!_request.Lines.Any())
+                                    {
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">No line items added yet.</td>
+                                        </tr>
+                                    }
+                                    @for (int i = 0; i < _request.Lines.Count; i++)
+                                    {
+                                        var line = _request.Lines[i];
+                                        var index = i;
+                                        <tr class="border-bottom">
+                                            <td>
+                                                <InputText @bind-Value="line.Name" class="form-control form-control-sm mb-1" placeholder="Item Name" disabled="@(line.CatalogItemId.HasValue)" />
+                                                <InputText @bind-Value="line.Description" class="form-control form-control-sm text-muted" placeholder="Description (optional)" disabled="@(line.CatalogItemId.HasValue)" />
+                                            </td>
+                                            <td>
+                                                <InputNumber @bind-Value="line.Quantity" class="form-control form-control-sm" step="0.01" />
+                                            </td>
+                                            <td>
+                                                <InputText @bind-Value="line.Unit" class="form-control form-control-sm" disabled="@(line.CatalogItemId.HasValue)" />
+                                            </td>
+                                            <td>
+                                                <InputNumber @bind-Value="line.UnitPrice" class="form-control form-control-sm" step="0.01" />
+                                            </td>
+                                            <td class="text-center">
+                                                <InputCheckbox @bind-Value="line.Taxable" class="form-check-input mt-2" disabled="@(line.CatalogItemId.HasValue)" />
+                                            </td>
+                                            <td class="text-end">
+                                                <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => RemoveLine(index)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-4 position-sticky" style="top: 1rem;">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-muted small">Tax Rate (%)</label>
+                            <InputNumber @bind-Value="_request.TaxRate" class="form-control text-end" step="0.01" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold text-muted small">Discount Amount ($)</label>
+                            <InputNumber @bind-Value="_request.DiscountAmount" class="form-control text-end" step="0.01" />
+                        </div>
+                        
+                        <hr />
+                        
+                        <dl class="row mb-0">
+                            <dt class="col-7">Subtotal</dt>
+                            <dd class="col-5 text-end">@CalculateSubtotal().ToString("C")</dd>
+                            
+                            <dt class="col-7">Discount</dt>
+                            <dd class="col-5 text-end text-danger">-@_request.DiscountAmount.ToString("C")</dd>
+                            
+                            <dt class="col-7">Tax</dt>
+                            <dd class="col-5 text-end">@CalculateTax().ToString("C")</dd>
+                        </dl>
+                        
+                        <hr />
+                        
+                        <dl class="row mb-4">
+                            <dt class="col-7 fs-5">Total</dt>
+                            <dd class="col-5 text-end fs-5 fw-bold">@CalculateTotal().ToString("C")</dd>
+                        </dl>
+                        
+                        <button type="submit" class="btn btn-primary w-100" disabled="@_isSubmitting">
+                            @if (_isSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-save me-1"></i> <span>Save Draft</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private CreateQuoteRequest _request = new CreateQuoteRequest();
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private string? _errorMessage;
+    
+    private List<CustomerDto> _customers = new();
+    private List<CatalogItemDto> _catalogItems = new();
+    private string _selectedCatalogItemId = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // For V1, load all active customers and catalog items for the dropdowns
+            var customerResult = await CustomerService.GetCustomersAsync(new SmallBusiness.Application.DTOs.Customers.CustomerSearchRequest { IsActive = true, PageSize = 1000 });
+            _customers = customerResult.Items.OrderBy(c => c.Name).ToList();
+
+            var catalogResult = await CatalogItemService.GetCatalogItemsAsync(new CatalogItemSearchRequest { IsActive = true, PageSize = 1000 });
+            _catalogItems = catalogResult.Items.OrderBy(c => c.Name).ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Failed to load lookup data: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void AddManualLine()
+    {
+        _request.Lines.Add(new QuoteLineRequest
+        {
+            Unit = "Each",
+            Quantity = 1,
+            Taxable = true
+        });
+    }
+    
+    private void AddCatalogLine()
+    {
+        if (Guid.TryParse(_selectedCatalogItemId, out var id))
+        {
+            var item = _catalogItems.FirstOrDefault(c => c.Id == id);
+            if (item != null)
+            {
+                _request.Lines.Add(new QuoteLineRequest
+                {
+                    CatalogItemId = item.Id,
+                    Name = item.Name,
+                    Description = item.Description,
+                    Unit = item.Unit,
+                    UnitPrice = item.SellingPrice,
+                    Quantity = 1,
+                    Taxable = item.Taxable
+                });
+            }
+        }
+        _selectedCatalogItemId = string.Empty;
+    }
+    
+    private void RemoveLine(int index)
+    {
+        if (index >= 0 && index < _request.Lines.Count)
+        {
+            _request.Lines.RemoveAt(index);
+        }
+    }
+
+    private decimal CalculateSubtotal()
+    {
+        return _request.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero));
+    }
+    
+    private decimal CalculateTax()
+    {
+        var taxableSubtotal = _request.Lines.Where(l => l.Taxable).Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero));
+        return Math.Round(taxableSubtotal * (_request.TaxRate / 100m), 2, MidpointRounding.AwayFromZero);
+    }
+    
+    private decimal CalculateTotal()
+    {
+        return Math.Round(CalculateSubtotal() - _request.DiscountAmount + CalculateTax(), 2, MidpointRounding.AwayFromZero);
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        if (!_request.Lines.Any())
+        {
+            _errorMessage = "Please add at least one line item.";
+            return;
+        }
+        
+        if (_request.DiscountAmount > CalculateSubtotal())
+        {
+            _errorMessage = "Discount cannot exceed subtotal.";
+            return;
+        }
+
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            var newId = await QuoteService.CreateQuoteAsync(_request);
+            NavigationManager.NavigateTo($"/quotes/{newId}");
+        }
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An unexpected error occurred: " + ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

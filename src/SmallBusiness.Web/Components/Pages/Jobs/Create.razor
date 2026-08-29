@@ -1,0 +1,179 @@
+@page "/jobs/create"
+@using SmallBusiness.Application.DTOs.Customers
+@using SmallBusiness.Application.DTOs.Jobs
+@using SmallBusiness.Application.Interfaces
+@inject IJobService JobService
+@inject ICustomerService CustomerService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Create Direct Job</PageTitle>
+
+<div class="mb-4">
+    <a href="/jobs" class="btn btn-outline-secondary">&larr; Back to Jobs</a>
+</div>
+
+<h1>Create Direct Job</h1>
+
+<div class="card">
+    <div class="card-body">
+        <EditForm Model="_request" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+            
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger">@_errorMessage</div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label">Customer</label>
+                <InputSelect @bind-Value="_request.CustomerId" class="form-select" @bind-Value:after="OnCustomerChanged">
+                    <option value="">-- Select Customer --</option>
+                    @foreach (var c in _customers)
+                    {
+                        <option value="@c.Id">@c.CustomerNumber - @c.Name</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => _request.CustomerId)" class="text-danger" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <InputText @bind-Value="_request.Title" class="form-control" />
+                <ValidationMessage For="@(() => _request.Title)" class="text-danger" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Description (Scope of Work)</label>
+                <InputTextArea @bind-Value="_request.Description" class="form-control" rows="3" />
+                <ValidationMessage For="@(() => _request.Description)" class="text-danger" />
+            </div>
+
+            <h4 class="mt-4">Service Address</h4>
+            
+            <div class="mb-3">
+                <label class="form-label">Street</label>
+                <InputText @bind-Value="_request.ServiceStreet" class="form-control" />
+                <ValidationMessage For="@(() => _request.ServiceStreet)" class="text-danger" />
+            </div>
+            
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">City</label>
+                    <InputText @bind-Value="_request.ServiceCity" class="form-control" />
+                    <ValidationMessage For="@(() => _request.ServiceCity)" class="text-danger" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">State</label>
+                    <InputText @bind-Value="_request.ServiceState" class="form-control" />
+                    <ValidationMessage For="@(() => _request.ServiceState)" class="text-danger" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Postal Code</label>
+                    <InputText @bind-Value="_request.ServicePostalCode" class="form-control" />
+                    <ValidationMessage For="@(() => _request.ServicePostalCode)" class="text-danger" />
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Access Instructions</label>
+                <InputTextArea @bind-Value="_request.AccessInstructions" class="form-control" rows="2" />
+                <ValidationMessage For="@(() => _request.AccessInstructions)" class="text-danger" />
+            </div>
+
+            <h4 class="mt-4">Job Tasks</h4>
+            <div class="mb-3">
+                @for (int i = 0; i < _request.Tasks.Count; i++)
+                {
+                    var index = i;
+                    <div class="input-group mb-2">
+                        <InputText @bind-Value="_request.Tasks[index].Description" class="form-control" placeholder="Task description..." />
+                        <button type="button" class="btn btn-outline-danger" @onclick="() => RemoveTask(index)">Remove</button>
+                    </div>
+                }
+                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AddTask">Add Task</button>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                    @if (_isSubmitting)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span> Creating...</span>
+                    }
+                    else
+                    {
+                        <span>Create Job</span>
+                    }
+                </button>
+                <a href="/jobs" class="btn btn-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private CreateJobRequest _request = new();
+    private List<CustomerDto> _customers = new();
+    private bool _isSubmitting = false;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var pagedCustomers = await CustomerService.GetCustomersAsync(new CustomerSearchRequest { PageSize = 1000 });
+        _customers = pagedCustomers.Items;
+    }
+
+    private void AddTask()
+    {
+        _request.Tasks.Add(new JobTaskRequest());
+    }
+
+    private void RemoveTask(int index)
+    {
+        if (index >= 0 && index < _request.Tasks.Count)
+        {
+            _request.Tasks.RemoveAt(index);
+        }
+    }
+    
+    private void OnCustomerChanged()
+    {
+        if (_request.CustomerId != Guid.Empty)
+        {
+            var c = _customers.FirstOrDefault(x => x.Id == _request.CustomerId);
+            if (c != null)
+            {
+                _request.ServiceStreet = c.AddressStreet ?? "";
+                _request.ServiceCity = c.AddressCity ?? "";
+                _request.ServiceState = c.AddressState ?? "";
+                _request.ServicePostalCode = c.AddressPostalCode ?? "";
+                _request.ServiceCountry = c.AddressCountry ?? "";
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (_request.CustomerId == Guid.Empty)
+        {
+            _errorMessage = "Please select a customer.";
+            return;
+        }
+
+        try
+        {
+            _isSubmitting = true;
+            _errorMessage = null;
+
+            var id = await JobService.CreateJobAsync(_request);
+            NavigationManager.NavigateTo($"/jobs/{id}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _isSubmitting = false;
+        }
+    }
+}

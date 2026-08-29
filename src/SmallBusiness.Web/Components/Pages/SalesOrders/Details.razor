@@ -1,0 +1,321 @@
+@page "/sales-orders/{Id:guid}"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.SalesOrders
+@using SmallBusiness.Domain.Enums
+@inject ISalesOrderService SalesOrderService
+@inject IJobService JobService
+@inject IInvoiceService InvoiceService
+@using SmallBusiness.Application.DTOs.Invoices
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Sales Order Details — SBMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            Sales Order 
+            @if (_order != null)
+            {
+                <span class="text-muted">@_order.SalesOrderNumber</span>
+            }
+        </h1>
+    </div>
+    <div>
+        <a href="/sales-orders" class="btn btn-outline-secondary me-2">Back to Sales Orders</a>
+        @if (_order != null)
+        {
+            <div class="d-inline-flex">
+                @if (_order.Status == SalesOrderStatus.Draft)
+                {
+                    <a href="/sales-orders/edit/@Id" class="btn btn-outline-primary me-2">Edit</a>
+                }
+                @if (_order.Status == SalesOrderStatus.Confirmed)
+                {
+                    <button class="btn btn-primary me-2" @onclick="CreateJob" disabled="@_isGeneratingJob">
+                        @if (_isGeneratingJob)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span> Creating...</span>
+                        }
+                        else
+                        {
+                            <span>Create Job</span>
+                        }
+                    </button>
+                }
+                @if (_order.Status == SalesOrderStatus.Completed)
+                {
+                    @if (_activeInvoice != null)
+                    {
+                        <a href="/invoices/@_activeInvoice.Id" class="btn btn-info me-2">View Invoice</a>
+                    }
+                    else
+                    {
+                        <button class="btn btn-success me-2" @onclick="CreateInvoice" disabled="@_isGeneratingInvoice">
+                            @if (_isGeneratingInvoice)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                <span> Creating...</span>
+                            }
+                            else
+                            {
+                                <span>Create Invoice</span>
+                            }
+                        </button>
+                    }
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else if (_order == null)
+{
+    <div class="alert alert-danger">Sales Order not found or access denied.</div>
+}
+else
+{
+    @if (_errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Line Items</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-striped mb-0">
+                            <thead class="table-light border-bottom">
+                                <tr>
+                                    <th style="width: 10%">Code</th>
+                                    <th style="width: 35%">Item</th>
+                                    <th style="width: 10%" class="text-end">Qty</th>
+                                    <th style="width: 10%">Unit</th>
+                                    <th style="width: 15%" class="text-end">Price</th>
+                                    <th style="width: 20%" class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in _order.Lines)
+                                {
+                                    <tr>
+                                        <td><span class="badge bg-light text-dark border">@(string.IsNullOrEmpty(line.ItemCode) ? "N/A" : line.ItemCode)</span></td>
+                                        <td>
+                                            <div class="fw-bold">@line.Name</div>
+                                            @if (!string.IsNullOrEmpty(line.Description))
+                                            {
+                                                <div class="small text-muted">@line.Description</div>
+                                            }
+                                        </td>
+                                        <td class="text-end">@line.Quantity.ToString("0.##")</td>
+                                        <td>@line.Unit</td>
+                                        <td class="text-end">@line.UnitPrice.ToString("C")</td>
+                                        <td class="text-end fw-bold">@line.LineTotal.ToString("C")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_order.Notes))
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0" style="white-space: pre-wrap;">@_order.Notes</p>
+                    </div>
+                </div>
+            }
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Status</h5>
+                        @switch (_order.Status)
+                        {
+                            case SalesOrderStatus.Draft:
+                                <span class="badge bg-secondary fs-6">Draft</span>
+                                break;
+                            case SalesOrderStatus.Confirmed:
+                                <span class="badge bg-primary fs-6">Confirmed</span>
+                                break;
+                            case SalesOrderStatus.Completed:
+                                <span class="badge bg-success fs-6">Completed</span>
+                                break;
+                            case SalesOrderStatus.Cancelled:
+                                <span class="badge bg-dark fs-6">Cancelled</span>
+                                break;
+                        }
+                    </div>
+                    
+                    @if (_order.Status == SalesOrderStatus.Draft)
+                    {
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" @onclick="() => ChangeStatus(SalesOrderStatus.Confirmed)" disabled="@(!_order.Lines.Any())">
+                                <i class="bi bi-check-lg"></i> Confirm Order
+                            </button>
+                            <button class="btn btn-outline-danger" @onclick="() => ChangeStatus(SalesOrderStatus.Cancelled)">
+                                Cancel Order
+                            </button>
+                        </div>
+                    }
+                    else if (_order.Status == SalesOrderStatus.Confirmed)
+                    {
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" @onclick="() => ChangeStatus(SalesOrderStatus.Completed)">
+                                <i class="bi bi-check-circle"></i> Complete Order
+                            </button>
+                            <button class="btn btn-outline-dark mt-2" @onclick="() => ChangeStatus(SalesOrderStatus.Cancelled)">
+                                Cancel Order
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-muted">Customer</dt>
+                        <dd class="col-sm-7"><a href="/customers/@_order.CustomerId" class="fw-bold text-decoration-none">@_order.CustomerNameSnapshot</a></dd>
+                        
+                        <dt class="col-sm-5 text-muted">Order Date</dt>
+                        <dd class="col-sm-7">@_order.OrderDate.ToShortDateString()</dd>
+                        
+                        @if (_order.QuoteId.HasValue)
+                        {
+                            <dt class="col-sm-5 text-muted">From Quote</dt>
+                            <dd class="col-sm-7">
+                                <a href="/quotes/@_order.QuoteId.Value" class="text-decoration-none">View Quote <i class="bi bi-box-arrow-up-right small"></i></a>
+                            </dd>
+                        }
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 bg-light">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7">Subtotal</dt>
+                        <dd class="col-5 text-end">@_order.Subtotal.ToString("C")</dd>
+                        
+                        <dt class="col-7">Discount</dt>
+                        <dd class="col-5 text-end text-danger">-@_order.DiscountAmount.ToString("C")</dd>
+                        
+                        <dt class="col-7">Tax (@_order.TaxRate.ToString("0.##")%)</dt>
+                        <dd class="col-5 text-end">@_order.TaxAmount.ToString("C")</dd>
+                    </dl>
+                    
+                    <hr />
+                    
+                    <dl class="row mb-0">
+                        <dt class="col-7 fs-4">Total</dt>
+                        <dd class="col-5 text-end fs-4 fw-bold">@_order.Total.ToString("C")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private SalesOrderDto? _order;
+    private InvoiceDto? _activeInvoice;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private bool _isGeneratingJob = false;
+    private bool _isGeneratingInvoice = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrderAsync();
+    }
+    
+    private async Task LoadOrderAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            _order = await SalesOrderService.GetSalesOrderAsync(Id);
+            
+            var invoices = await InvoiceService.GetInvoicesAsync(new InvoiceSearchRequest { SalesOrderId = Id });
+            _activeInvoice = invoices.FirstOrDefault(i => i.Status != InvoiceStatus.Void);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Failed to load order: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CreateInvoice()
+    {
+        try
+        {
+            _isGeneratingInvoice = true;
+            _errorMessage = null;
+            
+            var invoice = await InvoiceService.CreateInvoiceFromSalesOrderAsync(Id);
+            NavigationManager.NavigateTo($"/invoices/{invoice.Id}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _isGeneratingInvoice = false;
+        }
+    }
+
+    private async Task CreateJob()
+    {
+        try
+        {
+            _isGeneratingJob = true;
+            _errorMessage = null;
+            
+            var jobId = await JobService.CreateJobFromSalesOrderAsync(Id);
+            NavigationManager.NavigateTo($"/jobs/{jobId}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _isGeneratingJob = false;
+        }
+    }
+
+    private async Task ChangeStatus(SalesOrderStatus newStatus)
+    {
+        try
+        {
+            await SalesOrderService.ChangeSalesOrderStatusAsync(Id, newStatus);
+            await LoadOrderAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+}

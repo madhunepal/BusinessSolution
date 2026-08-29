@@ -1,0 +1,298 @@
+@page "/invoices/{id:guid}"
+@using SmallBusiness.Application.DTOs.Invoices
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Domain.Enums
+@using System.ComponentModel.DataAnnotations
+@inject IInvoiceService InvoiceService
+@inject NavigationManager Navigation
+
+<PageTitle>Invoice Details</PageTitle>
+
+@if (_invoice == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>Invoice @_invoice.InvoiceNumber</h1>
+            <div class="d-flex align-items-center gap-2 mt-2">
+                @{
+                    var badgeClass = _invoice.Status switch
+                    {
+                        InvoiceStatus.Draft => "bg-secondary",
+                        InvoiceStatus.Sent => _invoice.IsOverdue ? "bg-danger" : "bg-primary",
+                        InvoiceStatus.Void => "bg-dark",
+                        _ => "bg-secondary"
+                    };
+                }
+                <span class="badge @badgeClass fs-6">@_invoice.Status</span>
+                @if (_invoice.IsOverdue)
+                {
+                    <span class="badge bg-danger fs-6">Overdue</span>
+                }
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            @if (_invoice.Status == InvoiceStatus.Draft)
+            {
+                <button class="btn btn-outline-secondary" @onclick="EditMetadata">Edit Metadata</button>
+                <button class="btn btn-primary" @onclick="SendInvoice">Mark as Sent</button>
+                <button class="btn btn-danger" @onclick="VoidInvoice">Void Invoice</button>
+            }
+            else if (_invoice.Status == InvoiceStatus.Sent)
+            {
+                <button class="btn btn-danger" @onclick="VoidInvoice">Void Invoice</button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Line Items</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Price</th>
+                                    <th class="text-center">Tax</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in _invoice.Lines)
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>@line.ItemCode</strong><br />
+                                            <small class="text-muted">@line.Name</small>
+                                        </td>
+                                        <td>@line.Description</td>
+                                        <td class="text-end">@line.Quantity @line.Unit</td>
+                                        <td class="text-end">@line.UnitPrice.ToString("C")</td>
+                                        <td class="text-center">@(line.Taxable ? "Yes" : "No")</td>
+                                        <td class="text-end"><strong>@line.LineTotal.ToString("C")</strong></td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="5" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td class="text-end">@_invoice.Subtotal.ToString("C")</td>
+                                </tr>
+                                @if (_invoice.DiscountAmount > 0)
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-end"><strong>Discount:</strong></td>
+                                        <td class="text-end text-danger">-@_invoice.DiscountAmount.ToString("C")</td>
+                                    </tr>
+                                }
+                                <tr>
+                                    <td colspan="5" class="text-end"><strong>Tax:</strong></td>
+                                    <td class="text-end">@_invoice.TaxAmount.ToString("C")</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="5" class="text-end fs-5"><strong>Total:</strong></td>
+                                    <td class="text-end fs-5"><strong>@_invoice.Total.ToString("C")</strong></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="5" class="text-end text-muted">Amount Paid:</td>
+                                    <td class="text-end text-muted">@_invoice.AmountPaid.ToString("C")</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="5" class="text-end fs-5 text-primary"><strong>Balance Due:</strong></td>
+                                    <td class="text-end fs-5 text-primary"><strong>@_invoice.BalanceDue.ToString("C")</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Customer</h5>
+                    <p class="mb-1"><strong>@_invoice.CustomerName</strong> (@_invoice.CustomerNumber)</p>
+                    @if (!string.IsNullOrEmpty(_invoice.CustomerEmail))
+                    {
+                        <p class="mb-1 text-muted"><i class="bi bi-envelope"></i> @_invoice.CustomerEmail</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Details</h5>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Invoice Date</dt>
+                        <dd class="col-sm-7">@_invoice.InvoiceDate.ToString("d")</dd>
+
+                        <dt class="col-sm-5">Due Date</dt>
+                        <dd class="col-sm-7">@_invoice.DueDate.ToString("d")</dd>
+
+                        <dt class="col-sm-5">Terms</dt>
+                        <dd class="col-sm-7">@(_invoice.Terms ?? "-")</dd>
+
+                        <dt class="col-sm-5">Sales Order</dt>
+                        <dd class="col-sm-7">
+                            <a href="/sales-orders/@_invoice.SalesOrderId">@_invoice.SalesOrderNumber</a>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            
+            @if (!string.IsNullOrEmpty(_invoice.Notes))
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Notes</h5>
+                        <p class="card-text text-muted" style="white-space: pre-wrap">@_invoice.Notes</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (_showEditModal && _invoice != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Invoice Metadata</h5>
+                    <button type="button" class="btn-close" @onclick="CloseEditModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@_editModel" OnValidSubmit="SaveMetadata">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Due Date</label>
+                            <InputDate @bind-Value="_editModel.DueDate" class="form-control" />
+                            <ValidationMessage For="@(() => _editModel.DueDate)" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Terms</label>
+                            <InputText @bind-Value="_editModel.Terms" class="form-control" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <InputTextArea @bind-Value="_editModel.Notes" class="form-control" rows="3" />
+                        </div>
+                        
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseEditModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private InvoiceDto? _invoice;
+    private string? _errorMessage;
+    private bool _showEditModal;
+    private UpdateInvoiceMetadataRequest _editModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            _errorMessage = null;
+            _invoice = await InvoiceService.GetInvoiceAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void EditMetadata()
+    {
+        if (_invoice == null) return;
+        
+        _editModel = new UpdateInvoiceMetadataRequest
+        {
+            Id = _invoice.Id,
+            DueDate = _invoice.DueDate,
+            Terms = _invoice.Terms,
+            Notes = _invoice.Notes
+        };
+        _showEditModal = true;
+    }
+
+    private void CloseEditModal()
+    {
+        _showEditModal = false;
+    }
+
+    private async Task SaveMetadata()
+    {
+        try
+        {
+            await InvoiceService.UpdateDraftInvoiceMetadataAsync(_editModel);
+            _showEditModal = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _showEditModal = false;
+        }
+    }
+
+    private async Task SendInvoice()
+    {
+        try
+        {
+            await InvoiceService.SendInvoiceAsync(Id);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task VoidInvoice()
+    {
+        try
+        {
+            await InvoiceService.VoidInvoiceAsync(Id);
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+}

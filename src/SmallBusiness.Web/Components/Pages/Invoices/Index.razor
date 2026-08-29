@@ -1,0 +1,130 @@
+@page "/invoices"
+@using SmallBusiness.Application.DTOs.Invoices
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Domain.Enums
+@inject IInvoiceService InvoiceService
+@inject NavigationManager Navigation
+
+<PageTitle>Invoices</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Invoices</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <EditForm Model="@_searchRequest" OnValidSubmit="Search">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Search</label>
+                    <InputText @bind-Value="_searchRequest.Keyword" class="form-control" placeholder="Invoice # or Customer" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <InputSelect @bind-Value="_searchRequest.Status" class="form-select">
+                        <option value="">All Statuses</option>
+                        @foreach (var status in Enum.GetValues<InvoiceStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <InputCheckbox @bind-Value="_searchRequest.OverdueOnly" class="form-check-input" id="overdueCheck" />
+                        <label class="form-check-label" for="overdueCheck">
+                            Show Overdue Only
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">Search</button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (_invoices == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!_invoices.Any())
+{
+    <div class="alert alert-info">No invoices found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Date</th>
+                    <th>Due Date</th>
+                    <th>Customer</th>
+                    <th>Sales Order</th>
+                    <th>Total</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var invoice in _invoices)
+                {
+                    <tr>
+                        <td><strong>@invoice.InvoiceNumber</strong></td>
+                        <td>@invoice.InvoiceDate.ToString("d")</td>
+                        <td>
+                            @invoice.DueDate.ToString("d")
+                            @if (invoice.IsOverdue)
+                            {
+                                <span class="badge bg-danger ms-1">Overdue</span>
+                            }
+                        </td>
+                        <td>@invoice.CustomerName</td>
+                        <td>@invoice.SalesOrderNumber</td>
+                        <td>@invoice.Total.ToString("C")</td>
+                        <td>@invoice.BalanceDue.ToString("C")</td>
+                        <td>
+                            @{
+                                var badgeClass = invoice.Status switch
+                                {
+                                    InvoiceStatus.Draft => "bg-secondary",
+                                    InvoiceStatus.Sent => invoice.IsOverdue ? "bg-danger" : "bg-primary",
+                                    InvoiceStatus.Void => "bg-dark",
+                                    _ => "bg-secondary"
+                                };
+                            }
+                            <span class="badge @badgeClass">@invoice.Status</span>
+                        </td>
+                        <td>
+                            <a href="/invoices/@invoice.Id" class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<InvoiceDto>? _invoices;
+    private InvoiceSearchRequest _searchRequest = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInvoices();
+    }
+
+    private async Task Search()
+    {
+        await LoadInvoices();
+    }
+
+    private async Task LoadInvoices()
+    {
+        _invoices = await InvoiceService.GetInvoicesAsync(_searchRequest);
+    }
+}

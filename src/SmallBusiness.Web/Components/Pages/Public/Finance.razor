@@ -1,0 +1,91 @@
+@page "/finance"
+
+<PageTitle>Finance — SBMS</PageTitle>
+
+<div class="public-hero">
+    <div class="container">
+        <h1>Invoicing & Finance</h1>
+        <p class="lead">Generate invoices from completed orders. Track what customers owe and manage your cash flow.</p>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row g-4 mb-5">
+        <div class="col-md-6">
+            <h2 class="fw-bold">Financial Clarity</h2>
+            <p class="text-muted">
+                SBMS invoicing is built on immutable financial snapshots. When you create an invoice from a 
+                completed sales order, pricing, tax, and customer details are frozen — guaranteeing accuracy 
+                regardless of future catalog or customer changes.
+            </p>
+            <ul class="list-unstyled">
+                <li class="mb-2">✓ Invoice generation from completed Sales Orders</li>
+                <li class="mb-2">✓ Immutable financial snapshots</li>
+                <li class="mb-2">✓ Deterministic tax & discount calculations</li>
+                <li class="mb-2">✓ Draft → Sent → Void lifecycle</li>
+                <li class="mb-2">✓ Overdue detection</li>
+                <li class="mb-2">✓ Void with replacement — full audit trail</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Sample Invoice Summary</strong>
+                    <span class="badge bg-secondary sample-badge">DEMO DATA</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Invoice #</th><th>Customer</th><th>Total</th><th>Due</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>INV-000003</td><td>Acme Properties</td><td>$4,675.00</td>
+                                <td>Sep 15, 2026</td>
+                                <td><span class="badge bg-primary">Sent</span></td>
+                            </tr>
+                            <tr>
+                                <td>INV-000004</td><td>River Tech Corp</td><td>$6,825.00</td>
+                                <td>Sep 30, 2026</td>
+                                <td><span class="badge bg-secondary">Draft</span></td>
+                            </tr>
+                            <tr>
+                                <td>INV-000002</td><td>Greenfield HOA</td><td>$1,980.00</td>
+                                <td>Aug 15, 2026</td>
+                                <td><span class="badge bg-danger">Overdue</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="row mt-3 g-3">
+                <div class="col-4">
+                    <div class="card text-center p-3 shadow-sm">
+                        <small class="text-muted">Outstanding</small>
+                        <strong class="fs-5 text-primary">$13,480</strong>
+                        <span class="badge bg-secondary sample-badge mt-1">DEMO</span>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card text-center p-3 shadow-sm">
+                        <small class="text-muted">Overdue</small>
+                        <strong class="fs-5 text-danger">$1,980</strong>
+                        <span class="badge bg-secondary sample-badge mt-1">DEMO</span>
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card text-center p-3 shadow-sm">
+                        <small class="text-muted">This Month</small>
+                        <strong class="fs-5 text-success">$11,500</strong>
+                        <span class="badge bg-secondary sample-badge mt-1">DEMO</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="/Account/Register" class="btn btn-primary btn-lg me-2">Get Started</a>
+        <a href="/Account/Login" class="btn btn-outline-primary btn-lg">Log in</a>
+    </div>
+</div>

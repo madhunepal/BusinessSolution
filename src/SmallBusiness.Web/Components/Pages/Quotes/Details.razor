@@ -1,0 +1,292 @@
+@page "/quotes/{Id:guid}"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.Quotes
+@using SmallBusiness.Domain.Enums
+@inject IQuoteService QuoteService
+@inject ISalesOrderService SalesOrderService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Quote Details — SBMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0">
+            Quote 
+            @if (_quote != null)
+            {
+                <span class="text-muted">@_quote.QuoteNumber</span>
+            }
+        </h1>
+    </div>
+    <div>
+        <a href="/quotes" class="btn btn-outline-secondary me-2">Back to Quotes</a>
+        @if (_quote != null && _quote.Status == QuoteStatus.Draft)
+        {
+            <a href="/quotes/edit/@Id" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Edit Quote
+            </a>
+        }
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Loading...</p>
+}
+else if (_quote == null)
+{
+    <div class="alert alert-danger">Quote not found or access denied.</div>
+}
+else
+{
+    @if (_errorMessage != null)
+    {
+        <div class="alert alert-danger">
+            @_errorMessage
+        </div>
+    }
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Line Items</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-borderless table-striped mb-0">
+                            <thead class="table-light border-bottom">
+                                <tr>
+                                    <th style="width: 10%">Code</th>
+                                    <th style="width: 35%">Item</th>
+                                    <th style="width: 10%" class="text-end">Qty</th>
+                                    <th style="width: 10%">Unit</th>
+                                    <th style="width: 15%" class="text-end">Price</th>
+                                    <th style="width: 20%" class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in _quote.Lines)
+                                {
+                                    <tr>
+                                        <td><span class="badge bg-light text-dark border">@(string.IsNullOrEmpty(line.ItemCode) ? "N/A" : line.ItemCode)</span></td>
+                                        <td>
+                                            <div class="fw-bold">@line.Name</div>
+                                            @if (!string.IsNullOrEmpty(line.Description))
+                                            {
+                                                <div class="small text-muted">@line.Description</div>
+                                            }
+                                        </td>
+                                        <td class="text-end">@line.Quantity.ToString("0.##")</td>
+                                        <td>@line.Unit</td>
+                                        <td class="text-end">@line.UnitPrice.ToString("C")</td>
+                                        <td class="text-end fw-bold">@line.LineTotal.ToString("C")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_quote.Notes))
+            {
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Notes</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0" style="white-space: pre-wrap;">@_quote.Notes</p>
+                    </div>
+                </div>
+            }
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Status</h5>
+                        @switch (_quote.Status)
+                        {
+                            case QuoteStatus.Draft:
+                                <span class="badge bg-secondary fs-6">Draft</span>
+                                break;
+                            case QuoteStatus.Sent:
+                                <span class="badge bg-primary fs-6">Sent</span>
+                                break;
+                            case QuoteStatus.Accepted:
+                                <span class="badge bg-success fs-6">Accepted</span>
+                                break;
+                            case QuoteStatus.Rejected:
+                                <span class="badge bg-danger fs-6">Rejected</span>
+                                break;
+                            case QuoteStatus.Cancelled:
+                                <span class="badge bg-dark fs-6">Cancelled</span>
+                                break;
+                        }
+                    </div>
+                    
+                    @if (_quote.Status == QuoteStatus.Draft)
+                    {
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" @onclick="() => ChangeStatus(QuoteStatus.Sent)" disabled="@(!_quote.Lines.Any())">
+                                <i class="bi bi-send"></i> Mark as Sent
+                            </button>
+                            <button class="btn btn-outline-danger" @onclick="() => ChangeStatus(QuoteStatus.Cancelled)">
+                                Cancel Quote
+                            </button>
+                        </div>
+                    }
+                    else if (_quote.Status == QuoteStatus.Sent)
+                    {
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" @onclick="() => ChangeStatus(QuoteStatus.Accepted)">
+                                <i class="bi bi-check-circle"></i> Accept Quote
+                            </button>
+                            <button class="btn btn-danger" @onclick="() => ChangeStatus(QuoteStatus.Rejected)">
+                                <i class="bi bi-x-circle"></i> Reject Quote
+                            </button>
+                            <button class="btn btn-outline-dark mt-2" @onclick="() => ChangeStatus(QuoteStatus.Cancelled)">
+                                Cancel Quote
+                            </button>
+                        </div>
+                    }
+                    else if (_quote.Status == QuoteStatus.Accepted)
+                    {
+                        @if (_isConverting)
+                        {
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-success" disabled>
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    Converting...
+                                </button>
+                            </div>
+                        }
+                        else if (!_hasSalesOrder)
+                        {
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-success" @onclick="ConvertQuote">
+                                    <i class="bi bi-cart-plus"></i> Convert to Sales Order
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info mt-2 mb-0 text-center">
+                                <i class="bi bi-info-circle"></i> Converted to Sales Order.
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-muted">Customer</dt>
+                        <dd class="col-sm-7"><a href="/customers/@_quote.CustomerId" class="fw-bold text-decoration-none">@_quote.CustomerNameSnapshot</a></dd>
+                        
+                        <dt class="col-sm-5 text-muted">Date</dt>
+                        <dd class="col-sm-7">@_quote.QuoteDate.ToShortDateString()</dd>
+                        
+                        <dt class="col-sm-5 text-muted">Expires</dt>
+                        <dd class="col-sm-7">@(_quote.ExpirationDate?.ToShortDateString() ?? "N/A")</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4 bg-light">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-7">Subtotal</dt>
+                        <dd class="col-5 text-end">@_quote.Subtotal.ToString("C")</dd>
+                        
+                        <dt class="col-7">Discount</dt>
+                        <dd class="col-5 text-end text-danger">-@_quote.DiscountAmount.ToString("C")</dd>
+                        
+                        <dt class="col-7">Tax (@_quote.TaxRate.ToString("0.##")%)</dt>
+                        <dd class="col-5 text-end">@_quote.TaxAmount.ToString("C")</dd>
+                    </dl>
+                    
+                    <hr />
+                    
+                    <dl class="row mb-0">
+                        <dt class="col-7 fs-4">Total</dt>
+                        <dd class="col-5 text-end fs-4 fw-bold">@_quote.Total.ToString("C")</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private QuoteDto? _quote;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private bool _hasSalesOrder = false;
+    private bool _isConverting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadQuoteAsync();
+    }
+    
+    private async Task LoadQuoteAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        try
+        {
+            _quote = await QuoteService.GetQuoteAsync(Id);
+            
+            if (_quote.Status == QuoteStatus.Accepted)
+            {
+                var orders = await SalesOrderService.GetSalesOrdersAsync(new SmallBusiness.Application.DTOs.SalesOrders.SalesOrderSearchRequest { QuoteId = Id });
+                _hasSalesOrder = orders.Items.Any();
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Failed to load quote: " + ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ChangeStatus(QuoteStatus newStatus)
+    {
+        try
+        {
+            await QuoteService.ChangeQuoteStatusAsync(Id, newStatus);
+            await LoadQuoteAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+    
+    private async Task ConvertQuote()
+    {
+        _isConverting = true;
+        _errorMessage = null;
+        try
+        {
+            var salesOrderId = await SalesOrderService.ConvertQuoteToSalesOrderAsync(Id);
+            NavigationManager.NavigateTo($"/sales-orders/{salesOrderId}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Failed to convert quote: " + ex.Message;
+            _isConverting = false;
+        }
+    }
+}

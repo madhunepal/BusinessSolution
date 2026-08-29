@@ -1,0 +1,389 @@
+@page "/appointments/{Id:guid}"
+@using SmallBusiness.Application.DTOs.Appointments
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Domain.Enums
+@using System.ComponentModel.DataAnnotations
+@inject IAppointmentService AppointmentService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Appointment Details</PageTitle>
+
+<div class="mb-4">
+    <a href="/schedule" class="btn btn-outline-secondary me-2">&larr; Back to Schedule</a>
+    @if (_appointment != null)
+    {
+        <a href="/jobs/@_appointment.JobId" class="btn btn-outline-primary">View Job</a>
+    }
+</div>
+
+@if (_appointment == null)
+{
+    <p><em>Loading...</em></p>
+    if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Appointment for Job @_appointment.JobNumber</h1>
+        <div>
+            <span class="badge @GetStatusBadgeClass(_appointment.Status) fs-5">@_appointment.Status</span>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Schedule</h5>
+                    @if (_appointment.Status == AppointmentStatus.Scheduled)
+                    {
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => _showRescheduleModal = true">Reschedule</button>
+                    }
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <strong>Start:</strong> @_appointment.Start.ToLocalTime().ToString("f")
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>End:</strong> @_appointment.End.ToLocalTime().ToString("f")
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_appointment.Notes))
+                    {
+                        <hr />
+                        <strong>Notes:</strong>
+                        <p>@_appointment.Notes</p>
+                    }
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Assigned Technicians</h5>
+                    @if (_appointment.Status == AppointmentStatus.Scheduled || _appointment.Status == AppointmentStatus.InProgress)
+                    {
+                        <button class="btn btn-sm btn-primary" @onclick="() => _showAssignModal = true">Assign</button>
+                    }
+                </div>
+                <ul class="list-group list-group-flush">
+                    @if (!_appointment.Assignments.Any())
+                    {
+                        <li class="list-group-item text-muted">No technicians assigned.</li>
+                    }
+                    else
+                    {
+                        @foreach (var assignment in _appointment.Assignments)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-person-badge me-2"></i>
+                                    @assignment.UserName (ID: @assignment.UserId)
+                                </div>
+                                @if (_appointment.Status == AppointmentStatus.Scheduled)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveTechnician(assignment.UserId)">Remove</button>
+                                }
+                            </li>
+                        }
+                    }
+                </ul>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Job & Location</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>@_appointment.CustomerName</strong></p>
+                    <address class="mb-0">
+                        @if (!string.IsNullOrWhiteSpace(_appointment.ServiceStreet))
+                        {
+                            @_appointment.ServiceStreet<br>
+                            @($"{_appointment.ServiceCity}, {_appointment.ServiceState} {_appointment.ServicePostalCode}".Trim(',').Trim())
+                        }
+                        else
+                        {
+                            <span class="text-muted">No address provided</span>
+                        }
+                    </address>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Workflow</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        @if (_appointment.Status == AppointmentStatus.Scheduled)
+                        {
+                            <button class="btn btn-primary" @onclick="() => ChangeStatus(AppointmentStatus.InProgress)">Start Appointment</button>
+                            <button class="btn btn-outline-danger" @onclick="() => ChangeStatus(AppointmentStatus.Cancelled)">Cancel Appointment</button>
+                        }
+                        else if (_appointment.Status == AppointmentStatus.InProgress)
+                        {
+                            <button class="btn btn-success" @onclick="() => ChangeStatus(AppointmentStatus.Completed)">Complete Appointment</button>
+                            <button class="btn btn-outline-danger" @onclick="() => ChangeStatus(AppointmentStatus.Cancelled)">Cancel Appointment</button>
+                        }
+                        else
+                        {
+                            <div class="alert alert-secondary mb-0">This appointment is @_appointment.Status and cannot be changed.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showRescheduleModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reschedule Appointment</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showRescheduleModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_warningMessage))
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Warning:</strong> @_warningMessage
+                            <div class="mt-2">
+                                <div class="form-check">
+                                    <InputCheckbox @bind-Value="_ignoreConflicts" class="form-check-input" id="ignoreConflictsResch" />
+                                    <label class="form-check-label" for="ignoreConflictsResch">
+                                        Proceed and ignore conflicts
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Start Time</label>
+                        <input type="datetime-local" class="form-control" @bind="_rescheduleStart" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Time</label>
+                        <input type="datetime-local" class="form-control" @bind="_rescheduleEnd" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showRescheduleModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmReschedule">
+                        @if (_isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <span>Save</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showAssignModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign Technician</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showAssignModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_warningMessage))
+                    {
+                        <div class="alert alert-warning">
+                            <strong>Warning:</strong> @_warningMessage
+                            <div class="mt-2">
+                                <div class="form-check">
+                                    <InputCheckbox @bind-Value="_ignoreConflicts" class="form-check-input" id="ignoreConflictsAssign" />
+                                    <label class="form-check-label" for="ignoreConflictsAssign">
+                                        Proceed and ignore conflicts
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Technician User ID</label>
+                        <input type="text" class="form-control" @bind="_assignUserId" placeholder="Enter User ID..." />
+                        <small class="text-muted">In a full UI, this would be a dropdown of employees.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => _showAssignModal = false">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="ConfirmAssign">
+                        @if (_isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        }
+                        else
+                        {
+                            <span>Assign</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private AppointmentDto? _appointment;
+    private string? _errorMessage;
+    private string? _warningMessage;
+    private bool _ignoreConflicts = false;
+    private bool _isSubmitting = false;
+
+    // Reschedule State
+    private bool _showRescheduleModal = false;
+    private DateTime _rescheduleStart;
+    private DateTime _rescheduleEnd;
+
+    // Assign State
+    private bool _showAssignModal = false;
+    private string _assignUserId = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAppointment();
+    }
+
+    private async Task LoadAppointment()
+    {
+        try
+        {
+            _appointment = await AppointmentService.GetAppointmentAsync(Id);
+            _errorMessage = null;
+            
+            _rescheduleStart = _appointment.Start.ToLocalTime().DateTime;
+            _rescheduleEnd = _appointment.End.ToLocalTime().DateTime;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Could not load appointment: " + ex.Message;
+        }
+    }
+
+    private async Task ChangeStatus(AppointmentStatus newStatus)
+    {
+        try
+        {
+            await AppointmentService.ChangeAppointmentStatusAsync(Id, newStatus);
+            await LoadAppointment();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private async Task ConfirmReschedule()
+    {
+        try
+        {
+            _isSubmitting = true;
+            _errorMessage = null;
+            _warningMessage = null;
+
+            var request = new UpdateAppointmentTimeRequest
+            {
+                Start = new DateTimeOffset(_rescheduleStart),
+                End = new DateTimeOffset(_rescheduleEnd)
+            };
+
+            await AppointmentService.UpdateAppointmentTimeAsync(Id, request, _ignoreConflicts);
+            _showRescheduleModal = false;
+            await LoadAppointment();
+        }
+        catch (ValidationException ex) when (ex.Message.StartsWith("SCHEDULING_CONFLICT:"))
+        {
+            _warningMessage = ex.Message.Replace("SCHEDULING_CONFLICT:", "").Trim();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _showRescheduleModal = false;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task ConfirmAssign()
+    {
+        if (string.IsNullOrWhiteSpace(_assignUserId)) return;
+
+        try
+        {
+            _isSubmitting = true;
+            _errorMessage = null;
+            _warningMessage = null;
+
+            await AppointmentService.AssignTechnicianAsync(Id, _assignUserId, _ignoreConflicts);
+            _showAssignModal = false;
+            _assignUserId = string.Empty;
+            await LoadAppointment();
+        }
+        catch (ValidationException ex) when (ex.Message.StartsWith("SCHEDULING_CONFLICT:"))
+        {
+            _warningMessage = ex.Message.Replace("SCHEDULING_CONFLICT:", "").Trim();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _showAssignModal = false;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task RemoveTechnician(string userId)
+    {
+        try
+        {
+            await AppointmentService.RemoveTechnicianAsync(Id, userId);
+            await LoadAppointment();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private string GetStatusBadgeClass(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "bg-primary",
+        AppointmentStatus.InProgress => "bg-warning text-dark",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

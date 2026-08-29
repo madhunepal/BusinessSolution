@@ -1,0 +1,195 @@
+@page "/catalog/edit/{Id:guid}"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.CatalogItems
+@using SmallBusiness.Domain.Enums
+@inject ICatalogItemService CatalogItemService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Edit Catalog Item — SBMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Edit Item: @_itemCode</h1>
+    <a href="/catalog/@Id" class="btn btn-outline-secondary">Cancel</a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                @if (_isLoading)
+                {
+                    <p>Loading...</p>
+                }
+                else if (_request == null)
+                {
+                    <div class="alert alert-danger">Item not found.</div>
+                }
+                else
+                {
+                    @if (_errorMessage != null)
+                    {
+                        <div class="alert alert-danger">
+                            @_errorMessage
+                        </div>
+                    }
+
+                    <EditForm Model="@_request" OnValidSubmit="HandleValidSubmitAsync">
+                        <DataAnnotationsValidator />
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Type <span class="text-danger">*</span></label>
+                                <InputSelect @bind-Value="_request.Type" class="form-select">
+                                    <option value="1">Product</option>
+                                    <option value="2">Service</option>
+                                </InputSelect>
+                                <ValidationMessage For="@(() => _request.Type)" class="text-danger" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Item Code</label>
+                                <input type="text" class="form-control" value="@_itemCode" disabled />
+                                <div class="form-text">Item codes cannot be modified after creation.</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Name <span class="text-danger">*</span></label>
+                            <InputText @bind-Value="_request.Name" class="form-control" />
+                            <ValidationMessage For="@(() => _request.Name)" class="text-danger" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Description</label>
+                            <InputTextArea @bind-Value="_request.Description" class="form-control" rows="3" />
+                            <ValidationMessage For="@(() => _request.Description)" class="text-danger" />
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Unit <span class="text-danger">*</span></label>
+                                <InputText @bind-Value="_request.Unit" class="form-control" />
+                                <ValidationMessage For="@(() => _request.Unit)" class="text-danger" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Cost</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <InputNumber @bind-Value="_request.Cost" class="form-control" step="0.01" />
+                                </div>
+                                <ValidationMessage For="@(() => _request.Cost)" class="text-danger" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Selling Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <InputNumber @bind-Value="_request.SellingPrice" class="form-control" step="0.01" />
+                                </div>
+                                <ValidationMessage For="@(() => _request.SellingPrice)" class="text-danger" />
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <InputCheckbox @bind-Value="_request.Taxable" class="form-check-input" id="taxableCheck" />
+                                    <label class="form-check-label fw-bold" for="taxableCheck">
+                                        Item is taxable
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <InputCheckbox @bind-Value="_request.IsActive" class="form-check-input" id="activeCheck" />
+                                    <label class="form-check-label fw-bold" for="activeCheck">
+                                        Item is active
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                                @if (_isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Saving...</span>
+                                }
+                                else
+                                {
+                                    <span>Save Changes</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private UpdateCatalogItemRequest? _request;
+    private string _itemCode = string.Empty;
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var item = await CatalogItemService.GetCatalogItemAsync(Id);
+            _itemCode = item.ItemCode;
+            
+            _request = new UpdateCatalogItemRequest
+            {
+                Type = item.Type,
+                Name = item.Name,
+                Description = item.Description,
+                Unit = item.Unit,
+                Cost = item.Cost,
+                SellingPrice = item.SellingPrice,
+                Taxable = item.Taxable,
+                IsActive = item.IsActive
+            };
+        }
+        catch (KeyNotFoundException)
+        {
+            _request = null;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        if (_request == null) return;
+        
+        _isSubmitting = true;
+        _errorMessage = null;
+
+        try
+        {
+            await CatalogItemService.UpdateCatalogItemAsync(Id, _request);
+            NavigationManager.NavigateTo($"/catalog/{Id}");
+        }
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "An unexpected error occurred: " + ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

@@ -1,0 +1,155 @@
+@page "/schedule"
+@using SmallBusiness.Application.DTOs.Appointments
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Domain.Enums
+@inject IAppointmentService AppointmentService
+@rendermode InteractiveServer
+
+<PageTitle>Schedule</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Schedule</h1>
+    <div>
+        <button class="btn @(_currentView == "Today" ? "btn-primary" : "btn-outline-primary") me-2" @onclick="() => SetDateRange(0)">Today</button>
+        <button class="btn @(_currentView == "This Week" ? "btn-primary" : "btn-outline-primary")" @onclick="() => SetDateRange(7)">This Week</button>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" @bind="_searchRequest.StartDate" @bind:after="LoadAppointments" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" @bind="_searchRequest.EndDate" @bind:after="LoadAppointments" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select class="form-select" @bind="_searchRequest.Status" @bind:after="LoadAppointments">
+                    <option value="">All Statuses</option>
+                    @foreach (var status in Enum.GetValues<AppointmentStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_appointments == null)
+{
+    <p><em>Loading schedule...</em></p>
+}
+else if (!_appointments.Any())
+{
+    <div class="alert alert-info">No appointments scheduled for this period.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Job</th>
+                    <th>Customer & Location</th>
+                    <th>Status</th>
+                    <th>Technicians</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var appt in _appointments)
+                {
+                    <tr>
+                        <td>
+                            <strong>@appt.Start.ToLocalTime().ToString("MMM dd")</strong><br />
+                            @appt.Start.ToLocalTime().ToString("t") - @appt.End.ToLocalTime().ToString("t")
+                        </td>
+                        <td>
+                            <a href="/jobs/@appt.JobId">@appt.JobNumber</a><br />
+                            <small class="text-muted">@appt.JobTitle</small>
+                        </td>
+                        <td>
+                            <strong>@appt.CustomerName</strong><br />
+                            <small class="text-muted">
+                                @if (!string.IsNullOrWhiteSpace(appt.ServiceStreet))
+                                {
+                                    @($"{appt.ServiceStreet}, {appt.ServiceCity}")
+                                }
+                                else
+                                {
+                                    @("No address provided")
+                                }
+                            </small>
+                        </td>
+                        <td>
+                            <span class="badge @GetStatusBadgeClass(appt.Status)">@appt.Status</span>
+                        </td>
+                        <td>
+                            @if (!appt.Assignments.Any())
+                            {
+                                <span class="badge bg-warning text-dark">Unassigned</span>
+                            }
+                            else
+                            {
+                                @foreach (var assignment in appt.Assignments)
+                                {
+                                    <span class="badge bg-info text-dark me-1">@assignment.UserName</span>
+                                }
+                            }
+                        </td>
+                        <td>
+                            <a href="/appointments/@appt.Id" class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<AppointmentDto>? _appointments;
+    private AppointmentSearchRequest _searchRequest = new();
+    private string _currentView = "This Week";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SetDateRange(7); // Default to this week
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
+        _appointments = await AppointmentService.GetAppointmentsAsync(_searchRequest);
+        StateHasChanged();
+    }
+
+    private async Task SetDateRange(int days)
+    {
+        var today = DateTimeOffset.UtcNow.Date;
+        _searchRequest.StartDate = today;
+        _searchRequest.EndDate = days == 0 ? today.AddDays(1).AddTicks(-1) : today.AddDays(days);
+        
+        _currentView = days == 0 ? "Today" : "This Week";
+        
+        if (_appointments != null) // Don't load twice on init
+        {
+            await LoadAppointments();
+        }
+    }
+
+    private string GetStatusBadgeClass(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Scheduled => "bg-primary",
+        AppointmentStatus.InProgress => "bg-warning text-dark",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

@@ -1,0 +1,68 @@
+@page "/scheduling"
+
+<PageTitle>Scheduling — SBMS</PageTitle>
+
+<div class="public-hero">
+    <div class="container">
+        <h1>Scheduling & Technician Assignment</h1>
+        <p class="lead">Coordinate who goes where and when. Prevent double-booking and maximize crew utilization.</p>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row g-4 mb-5">
+        <div class="col-md-6">
+            <h2 class="fw-bold">Smart Scheduling</h2>
+            <p class="text-muted">
+                Create appointments linked to jobs, assign technicians, and detect scheduling conflicts 
+                in real-time. Track actual arrival and completion against scheduled windows.
+            </p>
+            <ul class="list-unstyled">
+                <li class="mb-2">✓ Appointments linked to jobs</li>
+                <li class="mb-2">✓ Technician assignment with conflict detection</li>
+                <li class="mb-2">✓ Timezone-aware scheduling</li>
+                <li class="mb-2">✓ Arrival windows for customer communication</li>
+                <li class="mb-2">✓ Actual start/end tracking</li>
+                <li class="mb-2">✓ Appointment lifecycle management</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Sample Weekly Schedule</strong>
+                    <span class="badge bg-secondary sample-badge">DEMO DATA</span>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Mon 9:00 AM</strong> — HVAC Install @@ Acme Properties
+                                <br /><small class="text-muted">Assigned: Mike T., Sarah K.</small>
+                            </div>
+                            <span class="badge bg-primary">Scheduled</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Tue 1:00 PM</strong> — Lawn Service @@ Greenfield HOA
+                                <br /><small class="text-muted">Assigned: Carlos R.</small>
+                            </div>
+                            <span class="badge bg-warning text-dark">In Progress</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Wed 8:30 AM</strong> — Panel Upgrade @@ River Tech
+                                <br /><small class="text-muted">Assigned: Mike T.</small>
+                            </div>
+                            <span class="badge bg-success">Completed</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="/Account/Register" class="btn btn-primary btn-lg me-2">Get Started</a>
+        <a href="/Account/Login" class="btn btn-outline-primary btn-lg">Log in</a>
+    </div>
+</div>

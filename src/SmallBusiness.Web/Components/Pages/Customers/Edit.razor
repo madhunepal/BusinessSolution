@@ -1,0 +1,182 @@
+@page "/customers/edit/{Id:guid}"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.Customers
+@using SmallBusiness.Domain.Enums
+@inject ICustomerService CustomerService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Edit Customer — SBMS</PageTitle>
+
+<div class="mb-4 d-flex justify-content-between align-items-center">
+    <h1>Edit Customer</h1>
+    <a href="/customers/@Id" class="btn btn-outline-secondary">Cancel</a>
+</div>
+
+@if (_isLoading)
+{
+    <p>Loading customer data...</p>
+}
+else if (_request == null)
+{
+    <div class="alert alert-danger">Customer not found.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <EditForm Model="@_request" OnValidSubmit="HandleValidSubmitAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" />
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Customer Type *</label>
+                        <InputSelect class="form-select" @bind-Value="_request.CustomerType">
+                            @foreach (var type in Enum.GetValues<CustomerType>())
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => _request.CustomerType)" class="text-danger" />
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="form-check form-switch mb-2">
+                            <InputCheckbox class="form-check-input" @bind-Value="_request.IsActive" id="isActiveSwitch" />
+                            <label class="form-check-label" for="isActiveSwitch">Active Account</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Name *</label>
+                        <InputText class="form-control" @bind-Value="_request.Name" placeholder="Company or Individual Name" />
+                        <ValidationMessage For="@(() => _request.Name)" class="text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Primary Contact Name</label>
+                        <InputText class="form-control" @bind-Value="_request.PrimaryContactName" />
+                        <ValidationMessage For="@(() => _request.PrimaryContactName)" class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <InputText type="email" class="form-control" @bind-Value="_request.Email" />
+                        <ValidationMessage For="@(() => _request.Email)" class="text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone Number</label>
+                        <InputText class="form-control" @bind-Value="_request.PhoneNumber" />
+                        <ValidationMessage For="@(() => _request.PhoneNumber)" class="text-danger" />
+                    </div>
+                </div>
+
+                <h5 class="mt-4 mb-3">Address</h5>
+                <div class="mb-3">
+                    <label class="form-label">Street</label>
+                    <InputText class="form-control" @bind-Value="_request.AddressStreet" />
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">City</label>
+                        <InputText class="form-control" @bind-Value="_request.AddressCity" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">State / Province</label>
+                        <InputText class="form-control" @bind-Value="_request.AddressState" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Postal Code</label>
+                        <InputText class="form-control" @bind-Value="_request.AddressPostalCode" />
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Country</label>
+                        <InputText class="form-control" @bind-Value="_request.AddressCountry" />
+                    </div>
+                </div>
+
+                <h5 class="mt-4 mb-3">Additional Information</h5>
+                <div class="mb-4">
+                    <label class="form-label">Notes</label>
+                    <InputTextArea class="form-control" @bind-Value="_request.Notes" rows="3" />
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                        @if (_isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Changes</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private UpdateCustomerRequest? _request;
+    private bool _isLoading = true;
+    private bool _isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var customer = await CustomerService.GetCustomerAsync(Id);
+            _request = new UpdateCustomerRequest
+            {
+                CustomerType = customer.CustomerType,
+                Name = customer.Name,
+                PrimaryContactName = customer.PrimaryContactName,
+                Email = customer.Email,
+                PhoneNumber = customer.PhoneNumber,
+                AddressStreet = customer.AddressStreet,
+                AddressCity = customer.AddressCity,
+                AddressState = customer.AddressState,
+                AddressPostalCode = customer.AddressPostalCode,
+                AddressCountry = customer.AddressCountry,
+                Notes = customer.Notes,
+                IsActive = customer.IsActive
+            };
+        }
+        catch (KeyNotFoundException)
+        {
+            _request = null;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        if (_request == null) return;
+        
+        _isSubmitting = true;
+        try
+        {
+            await CustomerService.UpdateCustomerAsync(Id, _request);
+            NavigationManager.NavigateTo($"/customers/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating customer: {ex.Message}");
+            _isSubmitting = false;
+        }
+    }
+}

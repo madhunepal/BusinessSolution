@@ -1,0 +1,39 @@
+ID,Epic,Title,Priority,Status
+SB-001,Foundation,Create solution structure,P0,Not Started
+SB-002,Foundation,Configure EF Core and SQL Server,P0,Not Started
+SB-003,Foundation,Configure Identity,P0,Not Started
+SB-004,Foundation,Business and BusinessUser,P0,Not Started
+SB-005,Foundation,Roles and permissions,P0,Not Started
+SB-006,Foundation,Activity and AuditLog,P1,Not Started
+CRM-001,CRM,Customer domain model,P0,Not Started
+CRM-002,CRM,Customer CRUD,P0,Not Started
+CRM-003,CRM,Customer search/filter,P1,Not Started
+CRM-004,CRM,Customer details,P1,Not Started
+CRM-005,CRM,Contacts,P1,Not Started
+CRM-006,CRM,Activity timeline,P1,Not Started
+SAL-001,Sales,Product and Service,P0,Not Started
+SAL-002,Sales,Quote and QuoteItem,P0,Not Started
+SAL-003,Sales,Quote state transitions,P0,Not Started
+SAL-004,Sales,Sales Order and Items,P0,Not Started
+SAL-005,Sales,Quote to Order conversion,P0,Not Started
+OPS-001,Operations,Job,P0,Not Started
+OPS-002,Operations,Job Tasks,P1,Not Started
+OPS-003,Operations,Appointment,P0,Not Started
+OPS-004,Operations,Employee assignment,P0,Not Started
+OPS-005,Operations,Start Job,P0,Not Started
+OPS-006,Operations,Complete Job,P0,Not Started
+FIN-001,Finance,Invoice and InvoiceItem,P0,Not Started
+FIN-002,Finance,Payment,P0,Not Started
+FIN-003,Finance,Invoice balance,P1,Not Started
+FIN-004,Finance,Overdue invoice,P1,Not Started
+INV-001,Inventory,Inventory transaction,P1,Not Started
+INV-002,Inventory,Stock balance,P1,Not Started
+INV-003,Inventory,Inventory adjustment,P1,Not Started
+PUR-001,Purchasing,Vendor,P1,Not Started
+PUR-002,Purchasing,Purchase Order,P1,Not Started
+PUR-003,Purchasing,Receiving,P1,Not Started
+EMP-001,Employees,Employee,P1,Not Started
+EMP-002,Employees,Time Entry,P1,Not Started
+REP-001,Reporting,Dashboard,P2,Not Started
+REP-002,Reporting,Sales report,P2,Not Started
+REP-003,Reporting,AR report,P2,Not Started

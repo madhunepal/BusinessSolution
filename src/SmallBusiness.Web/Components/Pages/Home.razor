@@ -1,0 +1,30 @@
+@page "/dashboard"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Dashboard — SBMS</PageTitle>
+
+<h1>Dashboard</h1>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title">User Information</h5>
+                <AuthorizeView>
+                    <Authorized>
+                        <ul class="list-unstyled mb-0">
+                            <li><strong>Email:</strong> @context.User.Identity?.Name</li>
+                            <li><strong>Roles:</strong> @string.Join(", ", context.User.Claims.Where(c => c.Type == System.Security.Claims.ClaimTypes.Role).Select(c => c.Value))</li>
+                        </ul>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <strong>Welcome to SBMS.</strong> Business modules will appear here as they are implemented.
+</div>
+

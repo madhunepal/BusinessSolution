@@ -1,0 +1,211 @@
+@page "/customers/{Id:guid}"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.Customers
+@inject ICustomerService CustomerService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Customer Details — SBMS</PageTitle>
+
+@if (_isLoading)
+{
+    <p>Loading customer details...</p>
+}
+else if (_customer == null)
+{
+    <div class="alert alert-danger">Customer not found.</div>
+    <a href="/customers" class="btn btn-primary">Back to Customers</a>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">
+                @_customer.Name
+                @if (!_customer.IsActive)
+                {
+                    <span class="badge bg-secondary ms-2 align-middle fs-6">Inactive</span>
+                }
+            </h1>
+            <div class="text-muted fs-5 mt-1">@_customer.CustomerNumber &bull; @_customer.CustomerType</div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/customers/edit/@_customer.Id" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+            @if (_customer.IsActive)
+            {
+                <button type="button" class="btn btn-outline-danger" @onclick="DeactivateAsync" disabled="@_isDeactivating">
+                    @if (_isDeactivating)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-person-x"></i> <span>Deactivate</span>
+                    }
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Contact Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-4 text-muted">Primary Contact</div>
+                        <div class="col-sm-8">@(_customer.PrimaryContactName ?? "-")</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4 text-muted">Email</div>
+                        <div class="col-sm-8">
+                            @if (!string.IsNullOrEmpty(_customer.Email))
+                            {
+                                <a href="mailto:@_customer.Email">@_customer.Email</a>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4 text-muted">Phone Number</div>
+                        <div class="col-sm-8">
+                            @if (!string.IsNullOrEmpty(_customer.PhoneNumber))
+                            {
+                                <a href="tel:@_customer.PhoneNumber">@_customer.PhoneNumber</a>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Address</h5>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrWhiteSpace(_customer.AddressStreet) || 
+                         !string.IsNullOrWhiteSpace(_customer.AddressCity) || 
+                         !string.IsNullOrWhiteSpace(_customer.AddressState) || 
+                         !string.IsNullOrWhiteSpace(_customer.AddressPostalCode) || 
+                         !string.IsNullOrWhiteSpace(_customer.AddressCountry))
+                    {
+                        <address class="mb-0">
+                            @if (!string.IsNullOrWhiteSpace(_customer.AddressStreet)) { <div>@_customer.AddressStreet</div> }
+                            <div>
+                                @if (!string.IsNullOrWhiteSpace(_customer.AddressCity)) { <span>@_customer.AddressCity,</span> }
+                                @if (!string.IsNullOrWhiteSpace(_customer.AddressState)) { <span>@_customer.AddressState</span> }
+                                @if (!string.IsNullOrWhiteSpace(_customer.AddressPostalCode)) { <span>@_customer.AddressPostalCode</span> }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(_customer.AddressCountry)) { <div>@_customer.AddressCountry</div> }
+                        </address>
+                    }
+                    else
+                    {
+                        <span class="text-muted">No address provided.</span>
+                    }
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Notes</h5>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrWhiteSpace(_customer.Notes))
+                    {
+                        <p class="mb-0 text-break" style="white-space: pre-wrap;">@_customer.Notes</p>
+                    }
+                    else
+                    {
+                        <span class="text-muted">No notes provided.</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">System Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Created At</small>
+                        <span>@_customer.CreatedAt.ToLocalTime().ToString("g")</span>
+                    </div>
+                    @if (_customer.UpdatedAt.HasValue)
+                    {
+                        <div>
+                            <small class="text-muted d-block">Last Updated</small>
+                            <span>@_customer.UpdatedAt.Value.ToLocalTime().ToString("g")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private CustomerDto? _customer;
+    private bool _isLoading = true;
+    private bool _isDeactivating = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomerAsync();
+    }
+
+    private async Task LoadCustomerAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _customer = await CustomerService.GetCustomerAsync(Id);
+        }
+        catch (KeyNotFoundException)
+        {
+            _customer = null;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task DeactivateAsync()
+    {
+        if (_customer == null) return;
+        
+        // Simple client-side confirmation
+        // In a real app, you might want to use a modal component
+        _isDeactivating = true;
+        try
+        {
+            await CustomerService.DeactivateCustomerAsync(Id);
+            await LoadCustomerAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deactivating customer: {ex.Message}");
+        }
+        finally
+        {
+            _isDeactivating = false;
+        }
+    }
+}

@@ -1,0 +1,151 @@
+@page "/catalog"
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.DTOs.CatalogItems
+@using SmallBusiness.Domain.Enums
+@inject ICatalogItemService CatalogItemService
+@rendermode InteractiveServer
+
+<PageTitle>Catalog — SBMS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Product & Service Catalog</h1>
+    <a href="/catalog/create" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> New Item
+    </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <EditForm Model="@_searchRequest" OnSubmit="SearchAsync" class="row g-3">
+            <div class="col-md-5">
+                <input type="text" class="form-control" placeholder="Search name, code, or description..." @bind="_searchRequest.Query" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_searchRequest.Type">
+                    <option value="">All Types</option>
+                    <option value="1">Product</option>
+                    <option value="2">Service</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" @bind="_searchRequest.IsActive">
+                    <option value="">All Statuses</option>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-secondary w-100">Search</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <p>Loading catalog items...</p>
+}
+else if (_result == null || !_result.Items.Any())
+{
+    <div class="alert alert-info">No catalog items found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Item Code</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Unit</th>
+                    <th class="text-end">Cost</th>
+                    <th class="text-end">Price</th>
+                    <th class="text-center">Taxable</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in _result.Items)
+                {
+                    <tr>
+                        <td>
+                            <a href="/catalog/@c.Id" class="text-decoration-none fw-bold">@c.ItemCode</a>
+                        </td>
+                        <td>
+                            @c.Name
+                        </td>
+                        <td>@c.Type</td>
+                        <td>@c.Unit</td>
+                        <td class="text-end">@c.Cost.ToString("C")</td>
+                        <td class="text-end">@c.SellingPrice.ToString("C")</td>
+                        <td class="text-center">
+                            @if (c.Taxable)
+                            {
+                                <i class="bi bi-check text-success fs-4"></i>
+                            }
+                        </td>
+                        <td>
+                            @if (c.IsActive)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactive</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <a href="/catalog/@c.Id" class="btn btn-sm btn-outline-primary">View</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <span class="text-muted">Showing page @_result.Page of @_result.TotalPages (@_result.TotalCount total items)</span>
+        <div class="btn-group">
+            <button class="btn btn-outline-secondary" disabled="@( _result.Page <= 1 )" @onclick="() => ChangePageAsync(_result.Page - 1)">Previous</button>
+            <button class="btn btn-outline-secondary" disabled="@( _result.Page >= _result.TotalPages )" @onclick="() => ChangePageAsync(_result.Page + 1)">Next</button>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private CatalogItemSearchRequest _searchRequest = new CatalogItemSearchRequest { IsActive = true };
+    private SmallBusiness.Application.Common.Models.PagedResult<CatalogItemDto>? _result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _searchRequest.Page = 1;
+        await LoadDataAsync();
+    }
+
+    private async Task ChangePageAsync(int page)
+    {
+        _searchRequest.Page = page;
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _result = await CatalogItemService.GetCatalogItemsAsync(_searchRequest);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

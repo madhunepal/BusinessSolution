@@ -1,0 +1,55 @@
+@page "/operations"
+
+<PageTitle>Operations — SBMS</PageTitle>
+
+<div class="public-hero">
+    <div class="container">
+        <h1>Operations & Job Management</h1>
+        <p class="lead">Turn sales orders into actionable jobs. Track work from start to finish.</p>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row g-4 mb-5">
+        <div class="col-md-6">
+            <h2 class="fw-bold">Manage Your Work</h2>
+            <p class="text-muted">
+                SBMS bridges the gap between sales and execution. Convert confirmed orders into jobs, 
+                break them into tasks, and track operational progress independently from the commercial agreement.
+            </p>
+            <ul class="list-unstyled">
+                <li class="mb-2">✓ Job creation from Sales Orders or direct entry</li>
+                <li class="mb-2">✓ Job tasks with progress tracking</li>
+                <li class="mb-2">✓ Status lifecycle: Pending → In Progress → Completed</li>
+                <li class="mb-2">✓ Job completion notes and timestamps</li>
+                <li class="mb-2">✓ Automatic Sales Order status updates</li>
+                <li class="mb-2">✓ Priority levels for workload management</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <strong>Sample Job Board</strong>
+                    <span class="badge bg-secondary sample-badge">DEMO DATA</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr><th>Job #</th><th>Title</th><th>Priority</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>JOB-000008</td><td>HVAC System Installation</td><td><span class="badge bg-danger">High</span></td><td><span class="badge bg-warning text-dark">In Progress</span></td></tr>
+                            <tr><td>JOB-000009</td><td>Quarterly Lawn Maintenance</td><td><span class="badge bg-info">Medium</span></td><td><span class="badge bg-secondary">Pending</span></td></tr>
+                            <tr><td>JOB-000010</td><td>Electrical Panel Upgrade</td><td><span class="badge bg-info">Medium</span></td><td><span class="badge bg-success">Completed</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="/Account/Register" class="btn btn-primary btn-lg me-2">Get Started</a>
+        <a href="/Account/Login" class="btn btn-outline-primary btn-lg">Log in</a>
+    </div>
+</div>

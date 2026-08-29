@@ -1,0 +1,168 @@
+@page "/jobs"
+@using SmallBusiness.Application.Common.Models
+@using SmallBusiness.Application.DTOs.Jobs
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Domain.Enums
+@inject IJobService JobService
+@rendermode InteractiveServer
+
+<PageTitle>Jobs</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Jobs</h1>
+    <a href="/jobs/create" class="btn btn-primary">Create Direct Job</a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <input type="text" class="form-control" placeholder="Search jobs..." @bind="_searchRequest.SearchTerm" @bind:event="oninput" @onkeyup="HandleSearch" />
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" @bind="_searchRequest.Status" @bind:after="LoadJobs">
+                    <option value="">All Statuses</option>
+                    @foreach (var status in Enum.GetValues<JobStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-secondary w-100" @onclick="LoadJobs">Search</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_result == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!_result.Items.Any())
+{
+    <div class="alert alert-info">No jobs found.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Job #</th>
+                    <th>Customer</th>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var job in _result.Items)
+                {
+                    <tr>
+                        <td>@job.JobNumber</td>
+                        <td>@job.CustomerNameSnapshot</td>
+                        <td>@job.Title</td>
+                        <td>
+                            <span class="badge @GetStatusBadgeClass(job.Status)">
+                                @job.Status
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge @GetPriorityBadgeClass(job.Priority)">
+                                @job.Priority
+                            </span>
+                        </td>
+                        <td>@(job.ReadyAt?.ToShortDateString() ?? "Draft")</td>
+                        <td>
+                            <a href="/jobs/@job.Id" class="btn btn-sm btn-outline-primary">Details</a>
+                            @if (job.Status == JobStatus.Draft || job.Status == JobStatus.Ready)
+                            {
+                                <a href="/jobs/edit/@job.Id" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_result.TotalPages > 1)
+    {
+        <nav aria-label="Page navigation" class="mt-4">
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(_result.Page > 1 ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => ChangePage(_result.Page - 1)">Previous</button>
+                </li>
+                
+                <li class="page-item disabled">
+                    <span class="page-link">Page @_result.Page of @_result.TotalPages</span>
+                </li>
+
+                <li class="page-item @(_result.Page < _result.TotalPages ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => ChangePage(_result.Page + 1)">Next</button>
+                </li>
+            </ul>
+        </nav>
+    }
+}
+
+@code {
+    private PagedResult<JobDto>? _result;
+    private JobSearchRequest _searchRequest = new() { PageSize = 10 };
+    private System.Timers.Timer? _debounceTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadJobs();
+    }
+
+    private async Task LoadJobs()
+    {
+        _result = await JobService.GetJobsAsync(_searchRequest);
+        StateHasChanged();
+    }
+
+    private void HandleSearch(KeyboardEventArgs e)
+    {
+        _debounceTimer?.Stop();
+        _debounceTimer = new System.Timers.Timer(500);
+        _debounceTimer.Elapsed += async (s, args) =>
+        {
+            _searchRequest.PageNumber = 1;
+            await InvokeAsync(LoadJobs);
+        };
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    private async Task ChangePage(int newPage)
+    {
+        if (newPage >= 1 && newPage <= (_result?.TotalPages ?? 1))
+        {
+            _searchRequest.PageNumber = newPage;
+            await LoadJobs();
+        }
+    }
+
+    private string GetStatusBadgeClass(JobStatus status) => status switch
+    {
+        JobStatus.Draft => "bg-secondary",
+        JobStatus.Ready => "bg-info",
+        JobStatus.InProgress => "bg-primary",
+        JobStatus.Completed => "bg-success",
+        JobStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetPriorityBadgeClass(JobPriority priority) => priority switch
+    {
+        JobPriority.Low => "bg-secondary text-dark",
+        JobPriority.Normal => "bg-primary",
+        JobPriority.High => "bg-warning text-dark",
+        JobPriority.Urgent => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

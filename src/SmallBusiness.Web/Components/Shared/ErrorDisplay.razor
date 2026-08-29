@@ -1,0 +1,20 @@
+<div class="alert alert-danger" role="alert">
+    <strong>Error:</strong> @Message
+    @if (Errors is not null && Errors.Length > 0)
+    {
+        <ul class="mb-0 mt-2">
+            @foreach (var error in Errors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } = "An error occurred.";
+
+    [Parameter]
+    public string[]? Errors { get; set; }
+}

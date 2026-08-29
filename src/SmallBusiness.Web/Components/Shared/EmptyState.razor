@@ -1,0 +1,15 @@
+<div class="text-center py-5">
+    <p class="text-muted fs-5">@Message</p>
+    @if (ChildContent is not null)
+    {
+        @ChildContent
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string Message { get; set; } = "No records found.";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}
