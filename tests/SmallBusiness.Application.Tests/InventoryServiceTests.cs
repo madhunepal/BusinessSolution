@@ -214,6 +214,126 @@ public class InventoryServiceTests : IDisposable
         await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.ReceiveStockAsync(req));
     }
 
+    [Fact]
+    public async Task ReceiveStock_TenantBLocation_IsRejectedWithoutPersistingInventoryRows()
+    {
+        var (profile, _) = await SetupProfileAndLocationAsync();
+        var otherLocationId = await SeedOtherTenantLocationAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.ReceiveStockAsync(new StockReceiptDto
+            {
+                InventoryProfileId = profile.Id,
+                InventoryLocationId = otherLocationId,
+                Quantity = 5
+            }));
+
+        Assert.Equal(0, await _context.InventoryMovements.CountAsync());
+        Assert.Equal(0, await _context.InventoryStockLevels.CountAsync());
+    }
+
+    [Fact]
+    public async Task RecordUsage_TenantBLocation_IsRejectedWithoutPersistingInventoryRows()
+    {
+        var (profile, _) = await SetupProfileAndLocationAsync(allowNegative: true);
+        var otherLocationId = await SeedOtherTenantLocationAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.RecordUsageAsync(new StockUsageDto
+            {
+                InventoryProfileId = profile.Id,
+                InventoryLocationId = otherLocationId,
+                Quantity = 1
+            }));
+
+        Assert.Equal(0, await _context.InventoryMovements.CountAsync());
+        Assert.Equal(0, await _context.InventoryStockLevels.CountAsync());
+    }
+
+    [Fact]
+    public async Task RecordWaste_TenantBLocation_IsRejectedWithoutPersistingInventoryRows()
+    {
+        var (profile, _) = await SetupProfileAndLocationAsync(allowNegative: true);
+        var otherLocationId = await SeedOtherTenantLocationAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.RecordWasteAsync(new StockWasteDto
+            {
+                InventoryProfileId = profile.Id,
+                InventoryLocationId = otherLocationId,
+                Quantity = 1
+            }));
+
+        Assert.Equal(0, await _context.InventoryMovements.CountAsync());
+        Assert.Equal(0, await _context.InventoryStockLevels.CountAsync());
+    }
+
+    [Fact]
+    public async Task AdjustStock_TenantBLocation_IsRejectedWithoutPersistingInventoryRows()
+    {
+        var (profile, _) = await SetupProfileAndLocationAsync();
+        var otherLocationId = await SeedOtherTenantLocationAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.AdjustStockAsync(new StockAdjustmentDto
+            {
+                InventoryProfileId = profile.Id,
+                InventoryLocationId = otherLocationId,
+                QuantityDifference = 1
+            }));
+
+        Assert.Equal(0, await _context.InventoryMovements.CountAsync());
+        Assert.Equal(0, await _context.InventoryStockLevels.CountAsync());
+    }
+
+    [Fact]
+    public async Task TransferStock_TenantBSourceLocation_IsRejectedWithoutPersistingNewInventoryRows()
+    {
+        var (profile, tenantLocation) = await SetupProfileAndLocationAsync();
+        var otherLocationId = await SeedOtherTenantLocationAsync();
+        var movementCount = await _context.InventoryMovements.CountAsync();
+        var stockLevelCount = await _context.InventoryStockLevels.CountAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.TransferStockAsync(new StockTransferDto
+            {
+                InventoryProfileId = profile.Id,
+                SourceLocationId = otherLocationId,
+                DestinationLocationId = tenantLocation.Id,
+                Quantity = 1
+            }));
+
+        Assert.Equal(movementCount, await _context.InventoryMovements.CountAsync());
+        Assert.Equal(stockLevelCount, await _context.InventoryStockLevels.CountAsync());
+    }
+
+    [Fact]
+    public async Task TransferStock_TenantBDestinationLocation_IsRejectedWithoutPersistingNewInventoryRows()
+    {
+        var (profile, tenantLocation) = await SetupProfileAndLocationAsync();
+        await _service.ReceiveStockAsync(new StockReceiptDto
+        {
+            InventoryProfileId = profile.Id,
+            InventoryLocationId = tenantLocation.Id,
+            Quantity = 5
+        });
+        var otherLocationId = await SeedOtherTenantLocationAsync();
+        var movementCount = await _context.InventoryMovements.CountAsync();
+        var stockLevelCount = await _context.InventoryStockLevels.CountAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.TransferStockAsync(new StockTransferDto
+            {
+                InventoryProfileId = profile.Id,
+                SourceLocationId = tenantLocation.Id,
+                DestinationLocationId = otherLocationId,
+                Quantity = 1
+            }));
+
+        Assert.Equal(movementCount, await _context.InventoryMovements.CountAsync());
+        Assert.Equal(stockLevelCount, await _context.InventoryStockLevels.CountAsync());
+    }
+
     private async Task<(InventoryProfileDto profile, InventoryLocationDto loc)> SetupProfileAndLocationAsync(
         bool trackLots = false, bool trackExpiration = false, bool allowNegative = false, decimal reorderLevel = 0)
     {
@@ -224,6 +344,21 @@ public class InventoryServiceTests : IDisposable
         var profile = await _service.CreateInventoryProfileAsync(new CreateInventoryProfileDto { CatalogItemId = product.Id, TrackLots = trackLots, TrackExpiration = trackExpiration, AllowNegativeStock = allowNegative, ReorderLevel = reorderLevel });
         var loc = await _service.CreateLocationAsync(new CreateInventoryLocationDto { Name = "Main" });
         return (profile, loc);
+    }
+
+    private async Task<Guid> SeedOtherTenantLocationAsync()
+    {
+        var location = new InventoryLocation
+        {
+            Id = Guid.NewGuid(),
+            BusinessId = Guid.NewGuid(),
+            Name = "Other Tenant Location",
+            IsActive = true
+        };
+
+        _context.InventoryLocations.Add(location);
+        await _context.SaveChangesAsync();
+        return location.Id;
     }
     
     

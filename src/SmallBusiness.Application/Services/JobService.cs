@@ -14,19 +14,23 @@ public class JobService : IJobService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
     public JobService(
         IApplicationDbContext context, 
         ITenantContext tenantContext,
-        ITenantSequenceService sequenceService)
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<Guid> CreateJobAsync(CreateJobRequest request)
     {
+        await EnsurePermissionAsync("Jobs.Create");
         var businessId = _tenantContext.CurrentBusinessId 
             ?? throw new UnauthorizedAccessException("Business context is required.");
 
@@ -92,6 +96,7 @@ public class JobService : IJobService
 
     public async Task<Guid> CreateJobFromSalesOrderAsync(Guid salesOrderId)
     {
+        await EnsurePermissionAsync("Jobs.Create");
         var businessId = _tenantContext.CurrentBusinessId 
             ?? throw new UnauthorizedAccessException("Business context is required.");
 
@@ -186,6 +191,7 @@ public class JobService : IJobService
 
     public async Task UpdateJobAsync(Guid id, UpdateJobRequest request)
     {
+        await EnsurePermissionAsync("Jobs.Edit");
         var job = await _context.Jobs
             .Include(j => j.Tasks)
             .FirstOrDefaultAsync(j => j.Id == id)
@@ -286,6 +292,7 @@ public class JobService : IJobService
 
     public async Task ChangeJobStatusAsync(Guid id, JobStatus newStatus, string? completionNotes = null)
     {
+        await EnsurePermissionAsync(newStatus == JobStatus.Completed ? "Jobs.Complete" : "Jobs.Edit");
         var job = await _context.Jobs
             .Include(j => j.SalesOrder)
             .FirstOrDefaultAsync(j => j.Id == id)
@@ -375,6 +382,7 @@ public class JobService : IJobService
 
     public async Task<JobDto> GetJobAsync(Guid id)
     {
+        await EnsurePermissionAsync("Jobs.View");
         var job = await _context.Jobs
             .Include(j => j.Tasks)
             .FirstOrDefaultAsync(j => j.Id == id)
@@ -385,6 +393,7 @@ public class JobService : IJobService
 
     public async Task<PagedResult<JobDto>> GetJobsAsync(JobSearchRequest request)
     {
+        await EnsurePermissionAsync("Jobs.View");
         var query = _context.Jobs.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
@@ -461,4 +470,7 @@ public class JobService : IJobService
             }).ToList()
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

@@ -12,16 +12,23 @@ public class InvoiceService : IInvoiceService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
-    public InvoiceService(IApplicationDbContext context, ITenantContext tenantContext, ITenantSequenceService sequenceService)
+    public InvoiceService(
+        IApplicationDbContext context,
+        ITenantContext tenantContext,
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<InvoiceDto> CreateInvoiceFromSalesOrderAsync(Guid salesOrderId)
     {
+        await EnsurePermissionAsync("Invoices.Create");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException("Business context required.");
 
         var salesOrder = await _context.SalesOrders
@@ -145,6 +152,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task<InvoiceDto> UpdateDraftInvoiceMetadataAsync(UpdateInvoiceMetadataRequest request)
     {
+        await EnsurePermissionAsync("Invoices.Create");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         
         var invoice = await _context.Invoices
@@ -184,6 +192,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task SendInvoiceAsync(Guid id)
     {
+        await EnsurePermissionAsync("Invoices.Create");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         
         var invoice = await _context.Invoices
@@ -212,6 +221,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task VoidInvoiceAsync(Guid id)
     {
+        await EnsurePermissionAsync("Invoices.Create");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         
         var invoice = await _context.Invoices
@@ -250,6 +260,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task<InvoiceDto> GetInvoiceAsync(Guid id)
     {
+        await EnsurePermissionAsync("Invoices.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         
         var invoice = await _context.Invoices
@@ -263,6 +274,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task<List<InvoiceDto>> GetInvoicesAsync(InvoiceSearchRequest request)
     {
+        await EnsurePermissionAsync("Invoices.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         
         var query = _context.Invoices
@@ -346,4 +358,7 @@ public class InvoiceService : IInvoiceService
             }).OrderBy(l => l.SortOrder).ToList() ?? new List<InvoiceLineDto>()
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

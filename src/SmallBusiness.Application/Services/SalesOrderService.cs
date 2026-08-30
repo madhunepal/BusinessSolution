@@ -14,19 +14,23 @@ public class SalesOrderService : ISalesOrderService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
     public SalesOrderService(
         IApplicationDbContext context, 
         ITenantContext tenantContext,
-        ITenantSequenceService sequenceService)
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<Guid> CreateSalesOrderAsync(CreateSalesOrderRequest request)
     {
+        await EnsurePermissionAsync("Orders.Create");
         var businessId = _tenantContext.CurrentBusinessId 
             ?? throw new UnauthorizedAccessException("Business context is required.");
 
@@ -78,6 +82,7 @@ public class SalesOrderService : ISalesOrderService
 
     public async Task<Guid> ConvertQuoteToSalesOrderAsync(Guid quoteId)
     {
+        await EnsurePermissionAsync("Orders.Create");
         var businessId = _tenantContext.CurrentBusinessId 
             ?? throw new UnauthorizedAccessException("Business context is required.");
 
@@ -186,6 +191,7 @@ public class SalesOrderService : ISalesOrderService
 
     public async Task UpdateDraftSalesOrderAsync(Guid id, UpdateSalesOrderRequest request)
     {
+        await EnsurePermissionAsync("Orders.Create");
         var order = await _context.SalesOrders
             .Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == id)
@@ -234,6 +240,7 @@ public class SalesOrderService : ISalesOrderService
 
     public async Task ChangeSalesOrderStatusAsync(Guid id, SalesOrderStatus newStatus)
     {
+        await EnsurePermissionAsync("Orders.Create");
         var order = await _context.SalesOrders
             .FirstOrDefaultAsync(o => o.Id == id)
             ?? throw new KeyNotFoundException("Sales Order not found or access denied.");
@@ -286,6 +293,7 @@ public class SalesOrderService : ISalesOrderService
 
     public async Task<SalesOrderDto> GetSalesOrderAsync(Guid id)
     {
+        await EnsurePermissionAsync("Orders.View");
         var order = await _context.SalesOrders
             .Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == id)
@@ -296,6 +304,7 @@ public class SalesOrderService : ISalesOrderService
 
     public async Task<PagedResult<SalesOrderDto>> GetSalesOrdersAsync(SalesOrderSearchRequest request)
     {
+        await EnsurePermissionAsync("Orders.View");
         var query = _context.SalesOrders.AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.SearchTerm))
@@ -430,4 +439,7 @@ public class SalesOrderService : ISalesOrderService
             }).ToList()
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

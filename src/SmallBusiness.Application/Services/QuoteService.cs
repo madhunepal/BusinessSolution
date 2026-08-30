@@ -13,19 +13,23 @@ public class QuoteService : IQuoteService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
     public QuoteService(
         IApplicationDbContext context,
         ITenantContext tenantContext,
-        ITenantSequenceService sequenceService)
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<Guid> CreateQuoteAsync(CreateQuoteRequest request)
     {
+        await EnsurePermissionAsync("Quotes.Create");
         Validator.ValidateObject(request, new ValidationContext(request), validateAllProperties: true);
 
         var businessId = _tenantContext.CurrentBusinessId 
@@ -70,6 +74,7 @@ public class QuoteService : IQuoteService
 
     public async Task UpdateDraftQuoteAsync(Guid id, UpdateQuoteRequest request)
     {
+        await EnsurePermissionAsync("Quotes.Edit");
         Validator.ValidateObject(request, new ValidationContext(request), validateAllProperties: true);
 
         var quote = await _context.Quotes
@@ -112,6 +117,7 @@ public class QuoteService : IQuoteService
 
     public async Task<QuoteDto> GetQuoteAsync(Guid id)
     {
+        await EnsurePermissionAsync("Quotes.View");
         var quote = await _context.Quotes
             .Include(q => q.Lines)
             .AsNoTracking()
@@ -123,6 +129,7 @@ public class QuoteService : IQuoteService
 
     public async Task<PagedResult<QuoteDto>> GetQuotesAsync(QuoteSearchRequest request)
     {
+        await EnsurePermissionAsync("Quotes.View");
         var query = _context.Quotes
             .AsNoTracking()
             .AsQueryable();
@@ -168,6 +175,7 @@ public class QuoteService : IQuoteService
 
     public async Task ChangeQuoteStatusAsync(Guid id, QuoteStatus newStatus)
     {
+        await EnsurePermissionAsync(newStatus == QuoteStatus.Accepted ? "Quotes.Approve" : "Quotes.Edit");
         var quote = await _context.Quotes
             .Include(q => q.Lines)
             .FirstOrDefaultAsync(q => q.Id == id)
@@ -364,4 +372,7 @@ public class QuoteService : IQuoteService
             SortOrder = l.SortOrder
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

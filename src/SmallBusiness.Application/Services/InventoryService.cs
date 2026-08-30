@@ -11,17 +11,23 @@ public class InventoryService : IInventoryService
 {
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
+    private readonly IPermissionService? _permissionService;
 
-    public InventoryService(IApplicationDbContext context, ITenantContext tenantContext)
+    public InventoryService(
+        IApplicationDbContext context,
+        ITenantContext tenantContext,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
+        _permissionService = permissionService;
     }
 
     private Guid GetBusinessId() => _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
 
     public async Task<List<InventoryProfileDto>> GetInventoryProfilesAsync()
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var profiles = await _context.InventoryProfiles
             .Include(p => p.CatalogItem)
@@ -39,6 +45,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryProfileDto> GetInventoryProfileAsync(Guid id)
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var profile = await _context.InventoryProfiles
             .Include(p => p.CatalogItem)
@@ -54,6 +61,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryProfileDto> CreateInventoryProfileAsync(CreateInventoryProfileDto request)
     {
+        await EnsurePermissionAsync("Inventory.Manage");
         var businessId = GetBusinessId();
         
         var catalogItem = await _context.CatalogItems
@@ -108,6 +116,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryProfileDto> UpdateInventoryProfileAsync(UpdateInventoryProfileDto request)
     {
+        await EnsurePermissionAsync("Inventory.Manage");
         var businessId = GetBusinessId();
         var profile = await _context.InventoryProfiles
             .Include(p => p.CatalogItem)
@@ -146,6 +155,7 @@ public class InventoryService : IInventoryService
 
     public async Task<List<InventoryLocationDto>> GetLocationsAsync()
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var locations = await _context.InventoryLocations
             .Where(l => l.BusinessId == businessId)
@@ -156,6 +166,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryLocationDto> CreateLocationAsync(CreateInventoryLocationDto request)
     {
+        await EnsurePermissionAsync("Inventory.Manage");
         var businessId = GetBusinessId();
         
         if (request.IsDefault)
@@ -185,6 +196,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryMovementDto> ReceiveStockAsync(StockReceiptDto request)
     {
+        await EnsurePermissionAsync("Inventory.Receive");
         if (request.Quantity <= 0)
             throw new ValidationException("Quantity must be greater than zero.");
             
@@ -202,6 +214,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryMovementDto> RecordUsageAsync(StockUsageDto request)
     {
+        await EnsurePermissionAsync("Inventory.Adjust");
         if (request.Quantity <= 0)
             throw new ValidationException("Quantity must be greater than zero.");
             
@@ -219,6 +232,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryMovementDto> RecordWasteAsync(StockWasteDto request)
     {
+        await EnsurePermissionAsync("Inventory.Adjust");
         if (request.Quantity <= 0)
             throw new ValidationException("Quantity must be greater than zero.");
             
@@ -236,6 +250,7 @@ public class InventoryService : IInventoryService
 
     public async Task<InventoryMovementDto> AdjustStockAsync(StockAdjustmentDto request)
     {
+        await EnsurePermissionAsync("Inventory.Adjust");
         if (request.QuantityDifference == 0)
             throw new ValidationException("Adjustment quantity cannot be zero.");
             
@@ -257,6 +272,7 @@ public class InventoryService : IInventoryService
 
     public async Task<List<InventoryMovementDto>> TransferStockAsync(StockTransferDto request)
     {
+        await EnsurePermissionAsync("Inventory.Transfer");
         if (request.Quantity <= 0)
             throw new ValidationException("Transfer quantity must be greater than zero.");
             
@@ -272,6 +288,9 @@ public class InventoryService : IInventoryService
                 var profile = await _context.InventoryProfiles
                     .FirstOrDefaultAsync(p => p.Id == request.InventoryProfileId && p.BusinessId == businessId)
                     ?? throw new KeyNotFoundException("Inventory profile not found.");
+
+                await ValidateLocationAsync(request.SourceLocationId, businessId);
+                await ValidateLocationAsync(request.DestinationLocationId, businessId);
 
                 if (profile.TrackLots && !request.InventoryLotId.HasValue)
                     throw new ValidationException("Lot selection is required for this inventory profile.");
@@ -381,6 +400,8 @@ public class InventoryService : IInventoryService
                 var profile = await _context.InventoryProfiles
                     .FirstOrDefaultAsync(p => p.Id == profileId && p.BusinessId == businessId)
                     ?? throw new KeyNotFoundException("Inventory profile not found.");
+
+                await ValidateLocationAsync(locationId, businessId);
 
                 Guid? finalLotId = existingLotId;
 
@@ -537,6 +558,7 @@ public class InventoryService : IInventoryService
 
     public async Task<List<InventoryMovementDto>> GetMovementHistoryAsync(Guid profileId)
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var movements = await _context.InventoryMovements
             .Include(m => m.InventoryLocation)
@@ -551,6 +573,7 @@ public class InventoryService : IInventoryService
 
     public async Task<List<InventoryStockLevelDto>> GetStockLevelsAsync(Guid profileId)
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var levels = await _context.InventoryStockLevels
             .Include(s => s.InventoryLocation)
@@ -571,6 +594,7 @@ public class InventoryService : IInventoryService
 
     public async Task<List<InventoryProfileDto>> GetLowStockProfilesAsync()
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         
         var profiles = await _context.InventoryProfiles
@@ -592,6 +616,7 @@ public class InventoryService : IInventoryService
 
     public async Task<List<InventoryLotDto>> GetExpiringLotsAsync(int daysToExpiration = 30)
     {
+        await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var thresholdDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysToExpiration));
         
@@ -658,4 +683,18 @@ public class InventoryService : IInventoryService
         OccurredAt = m.OccurredAt,
         CreatedBy = m.CreatedBy
     };
+
+    private async Task ValidateLocationAsync(Guid locationId, Guid businessId)
+    {
+        var exists = await _context.InventoryLocations
+            .AnyAsync(l => l.Id == locationId && l.BusinessId == businessId && l.IsActive);
+
+        if (!exists)
+        {
+            throw new ValidationException("Inventory location is invalid or belongs to another tenant.");
+        }
+    }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

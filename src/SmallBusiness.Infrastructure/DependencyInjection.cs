@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,6 +7,7 @@ using SmallBusiness.Application.Interfaces;
 using SmallBusiness.Application.Services;
 using SmallBusiness.Infrastructure.Data;
 using SmallBusiness.Infrastructure.Identity;
+using SmallBusiness.Infrastructure.Services;
 
 namespace SmallBusiness.Infrastructure;
 
@@ -29,6 +31,8 @@ public static class DependencyInjection
         // Expose IApplicationDbContext for the Application layer
         services.AddScoped<IApplicationDbContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IPermissionService, PermissionService>();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         // ASP.NET Core Identity
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -43,6 +47,21 @@ public static class DependencyInjection
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
+
+        return services;
+    }
+
+    public static IServiceCollection AddPermissionPolicies(this IServiceCollection services)
+    {
+        services.AddAuthorization(options =>
+        {
+            foreach (var permission in Permissions.All)
+            {
+                options.AddPolicy(permission, policy =>
+                    policy.RequireAuthenticatedUser()
+                        .AddRequirements(new PermissionRequirement(permission)));
+            }
+        });
 
         return services;
     }

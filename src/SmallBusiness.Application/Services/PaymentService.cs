@@ -12,16 +12,23 @@ public class PaymentService : IPaymentService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
-    public PaymentService(IApplicationDbContext context, ITenantContext tenantContext, ITenantSequenceService sequenceService)
+    public PaymentService(
+        IApplicationDbContext context,
+        ITenantContext tenantContext,
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<PaymentDto> CreatePaymentAsync(CreatePaymentDto request)
     {
+        await EnsurePermissionAsync("Payments.Record");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException("Business context required.");
 
         if (request.Amount <= 0)
@@ -126,6 +133,7 @@ public class PaymentService : IPaymentService
 
     public async Task<List<PaymentDto>> GetPaymentsForInvoiceAsync(Guid invoiceId)
     {
+        await EnsurePermissionAsync("Payments.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
 
         var payments = await _context.Payments
@@ -139,6 +147,7 @@ public class PaymentService : IPaymentService
 
     public async Task<PaymentDto> GetPaymentAsync(Guid id)
     {
+        await EnsurePermissionAsync("Payments.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
 
         var payment = await _context.Payments
@@ -163,4 +172,7 @@ public class PaymentService : IPaymentService
             CreatedAt = payment.CreatedAt
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

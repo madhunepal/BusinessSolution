@@ -13,19 +13,23 @@ public class CustomerService : ICustomerService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
     public CustomerService(
         IApplicationDbContext context, 
         ITenantContext tenantContext,
-        ITenantSequenceService sequenceService)
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<Guid> CreateCustomerAsync(CreateCustomerRequest request)
     {
+        await EnsurePermissionAsync("Customers.Create");
         Validator.ValidateObject(request, new ValidationContext(request), validateAllProperties: true);
 
         var businessId = _tenantContext.CurrentBusinessId 
@@ -70,6 +74,7 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerDto> GetCustomerAsync(Guid id)
     {
+        await EnsurePermissionAsync("Customers.View");
         var customer = await _context.Customers
             .FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new KeyNotFoundException($"Customer {id} not found.");
@@ -79,6 +84,7 @@ public class CustomerService : ICustomerService
 
     public async Task<PagedResult<CustomerDto>> GetCustomersAsync(CustomerSearchRequest request)
     {
+        await EnsurePermissionAsync("Customers.View");
         var query = _context.Customers.AsQueryable();
 
         if (request.IsActive.HasValue)
@@ -116,6 +122,7 @@ public class CustomerService : ICustomerService
 
     public async Task UpdateCustomerAsync(Guid id, UpdateCustomerRequest request)
     {
+        await EnsurePermissionAsync("Customers.Edit");
         Validator.ValidateObject(request, new ValidationContext(request), validateAllProperties: true);
 
         var customer = await _context.Customers
@@ -150,6 +157,7 @@ public class CustomerService : ICustomerService
 
     public async Task DeactivateCustomerAsync(Guid id)
     {
+        await EnsurePermissionAsync("Customers.Delete");
         var customer = await _context.Customers
             .FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new KeyNotFoundException($"Customer {id} not found.");
@@ -192,4 +200,7 @@ public class CustomerService : ICustomerService
             UpdatedAt = c.UpdatedAt
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

@@ -11,15 +11,21 @@ public class AppointmentService : IAppointmentService
 {
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
+    private readonly IPermissionService? _permissionService;
 
-    public AppointmentService(IApplicationDbContext context, ITenantContext tenantContext)
+    public AppointmentService(
+        IApplicationDbContext context,
+        ITenantContext tenantContext,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
+        _permissionService = permissionService;
     }
 
     public async Task<Guid> CreateAppointmentAsync(CreateAppointmentRequest request, bool ignoreConflicts = false)
     {
+        await EnsurePermissionAsync("Schedule.Manage");
         if (request.End <= request.Start)
             throw new ValidationException("End time must be after Start time.");
 
@@ -85,6 +91,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<AppointmentDto> GetAppointmentAsync(Guid id)
     {
+        await EnsurePermissionAsync("Schedule.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         var appointment = await _context.Appointments
             .Include(a => a.Job)
@@ -97,6 +104,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task<List<AppointmentDto>> GetAppointmentsAsync(AppointmentSearchRequest request)
     {
+        await EnsurePermissionAsync("Schedule.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         var query = _context.Appointments
             .Include(a => a.Job)
@@ -131,6 +139,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task UpdateAppointmentTimeAsync(Guid id, UpdateAppointmentTimeRequest request, bool ignoreConflicts = false)
     {
+        await EnsurePermissionAsync("Schedule.Manage");
         if (request.End <= request.Start)
             throw new ValidationException("End time must be after Start time.");
 
@@ -166,6 +175,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task ChangeAppointmentStatusAsync(Guid id, AppointmentStatus status)
     {
+        await EnsurePermissionAsync("Schedule.Manage");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         var appointment = await _context.Appointments
             .Include(a => a.Job)
@@ -259,6 +269,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task AssignTechnicianAsync(Guid appointmentId, string userId, bool ignoreConflicts = false)
     {
+        await EnsurePermissionAsync("Schedule.Manage");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         var appointment = await _context.Appointments
             .Include(a => a.Assignments)
@@ -304,6 +315,7 @@ public class AppointmentService : IAppointmentService
 
     public async Task RemoveTechnicianAsync(Guid appointmentId, string userId)
     {
+        await EnsurePermissionAsync("Schedule.Manage");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
         var appointment = await _context.Appointments
             .Include(a => a.Assignments)
@@ -391,4 +403,7 @@ public class AppointmentService : IAppointmentService
             }).ToList()
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }

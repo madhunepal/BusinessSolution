@@ -248,4 +248,54 @@ public class CustomerServiceTests
         Assert.Equal(requestCount, results.Length);
         Assert.Equal(requestCount, results.Distinct().Count()); // All must be unique
     }
+
+    [Fact]
+    public async Task GetCustomersAsync_WithoutCustomersViewPermission_ThrowsUnauthorized()
+    {
+        var businessId = Guid.NewGuid();
+        var mockContext = new Mock<ITenantContext>();
+        mockContext.Setup(x => x.CurrentBusinessId).Returns(businessId);
+
+        await using var dbContext = CreateInMemoryContext(mockContext.Object);
+        var sequenceService = new Mock<ITenantSequenceService>();
+        var permissions = new Mock<IPermissionService>();
+        permissions
+            .Setup(x => x.EnsurePermissionAsync("Customers.View", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new UnauthorizedAccessException());
+
+        var service = new CustomerService(dbContext, mockContext.Object, sequenceService.Object, permissions.Object);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.GetCustomersAsync(new CustomerSearchRequest()));
+    }
+
+    [Fact]
+    public async Task GetCustomersAsync_WithCustomersViewPermission_Succeeds()
+    {
+        var businessId = Guid.NewGuid();
+        var mockContext = new Mock<ITenantContext>();
+        mockContext.Setup(x => x.CurrentBusinessId).Returns(businessId);
+
+        await using var dbContext = CreateInMemoryContext(mockContext.Object);
+        dbContext.Customers.Add(new Customer
+        {
+            Id = Guid.NewGuid(),
+            BusinessId = businessId,
+            CustomerNumber = "CUST-1",
+            Name = "Acme"
+        });
+        await dbContext.SaveChangesAsync();
+
+        var sequenceService = new Mock<ITenantSequenceService>();
+        var permissions = new Mock<IPermissionService>();
+        permissions
+            .Setup(x => x.EnsurePermissionAsync("Customers.View", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = new CustomerService(dbContext, mockContext.Object, sequenceService.Object, permissions.Object);
+
+        var result = await service.GetCustomersAsync(new CustomerSearchRequest());
+
+        Assert.Single(result.Items);
+    }
 }

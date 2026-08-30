@@ -13,19 +13,23 @@ public class CatalogItemService : ICatalogItemService
     private readonly IApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly ITenantSequenceService _sequenceService;
+    private readonly IPermissionService? _permissionService;
 
     public CatalogItemService(
         IApplicationDbContext context,
         ITenantContext tenantContext,
-        ITenantSequenceService sequenceService)
+        ITenantSequenceService sequenceService,
+        IPermissionService? permissionService = null)
     {
         _context = context;
         _tenantContext = tenantContext;
         _sequenceService = sequenceService;
+        _permissionService = permissionService;
     }
 
     public async Task<Guid> CreateCatalogItemAsync(CreateCatalogItemRequest request)
     {
+        await EnsurePermissionAsync("Inventory.Manage");
         Validator.ValidateObject(request, new ValidationContext(request), validateAllProperties: true);
 
         var businessId = _tenantContext.CurrentBusinessId 
@@ -82,6 +86,7 @@ public class CatalogItemService : ICatalogItemService
 
     public async Task UpdateCatalogItemAsync(Guid id, UpdateCatalogItemRequest request)
     {
+        await EnsurePermissionAsync("Inventory.Manage");
         Validator.ValidateObject(request, new ValidationContext(request), validateAllProperties: true);
 
         var item = await _context.CatalogItems
@@ -114,6 +119,7 @@ public class CatalogItemService : ICatalogItemService
 
     public async Task<CatalogItemDto> GetCatalogItemAsync(Guid id)
     {
+        await EnsurePermissionAsync("Inventory.View");
         var item = await _context.CatalogItems
             .AsNoTracking()
             .FirstOrDefaultAsync(c => c.Id == id)
@@ -124,6 +130,7 @@ public class CatalogItemService : ICatalogItemService
 
     public async Task<PagedResult<CatalogItemDto>> GetCatalogItemsAsync(CatalogItemSearchRequest request)
     {
+        await EnsurePermissionAsync("Inventory.View");
         var query = _context.CatalogItems.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(request.Query))
@@ -165,6 +172,7 @@ public class CatalogItemService : ICatalogItemService
 
     public async Task DeactivateCatalogItemAsync(Guid id)
     {
+        await EnsurePermissionAsync("Inventory.Manage");
         var item = await _context.CatalogItems
             .FirstOrDefaultAsync(c => c.Id == id)
             ?? throw new KeyNotFoundException($"Catalog Item {id} not found.");
@@ -208,4 +216,7 @@ public class CatalogItemService : ICatalogItemService
             UpdatedAt = item.UpdatedAt
         };
     }
+
+    private Task EnsurePermissionAsync(string permission) =>
+        _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 }
