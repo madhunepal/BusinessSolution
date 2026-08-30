@@ -97,14 +97,20 @@ public class InventoryConcurrencyTests : IDisposable
         Assert.NotNull(exception);
         Assert.IsType<ValidationException>(exception);
         Assert.Contains("Insufficient stock", exception.Message);
+        Assert.DoesNotContain(contextB.ChangeTracker.Entries(),
+            e => e.State is EntityState.Added or EntityState.Modified);
+        await contextB.SaveChangesAsync();
 
         using var verifyContext = new ApplicationDbContext(_options, _mockTenantContext.Object);
         var finalBucket = await verifyContext.InventoryStockLevels.FirstAsync();
         var finalMovements = await verifyContext.InventoryMovements.ToListAsync();
+        var finalActivities = await verifyContext.Activities.ToListAsync();
 
         Assert.Equal(1, finalBucket.QuantityOnHand);
-        // 1 receipt + 1 successful reduction
+        Assert.Equal(finalMovements.Sum(m => m.Quantity), finalBucket.QuantityOnHand);
         Assert.Equal(2, finalMovements.Count);
+        Assert.Single(finalMovements, m => m.MovementType == InventoryMovementType.Usage && m.Quantity == -4);
+        Assert.Single(finalActivities, a => a.ActivityType == ActivityType.StockUsed);
     }
 
     public void Dispose()

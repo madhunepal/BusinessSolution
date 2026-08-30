@@ -121,9 +121,7 @@ public class PaymentService : IPaymentService
                 if (i == maxRetries - 1)
                     throw new InvalidOperationException("Failed to process payment due to concurrent updates on the invoice.");
                 
-                // Clear the tracker to reload the invoice fresh in the next iteration
-                _context.Invoices.Local.Clear();
-                _context.Payments.Local.Clear();
+                ClearTrackedState();
                 await Task.Delay(Random.Shared.Next(50, 150));
             }
         }
@@ -175,4 +173,18 @@ public class PaymentService : IPaymentService
 
     private Task EnsurePermissionAsync(string permission) =>
         _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
+
+    private void ClearTrackedState()
+    {
+        if (_context is DbContext dbContext)
+        {
+            dbContext.ChangeTracker.Clear();
+            return;
+        }
+
+        _context.Invoices.Local.Clear();
+        _context.Payments.Local.Clear();
+        _context.Activities.Local.Clear();
+        _context.AuditLogs.Local.Clear();
+    }
 }

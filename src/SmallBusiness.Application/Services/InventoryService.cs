@@ -369,9 +369,7 @@ public class InventoryService : IInventoryService
             {
                 if (i == maxRetries - 1) throw new InvalidOperationException("Failed to transfer stock due to concurrent updates.");
                 
-                // Detach entities to reload cleanly
-                _context.InventoryStockLevels.Local.Clear();
-                _context.InventoryMovements.Local.Clear();
+                ClearTrackedState();
                 await Task.Delay(Random.Shared.Next(50, 150));
             }
         }
@@ -510,9 +508,7 @@ public class InventoryService : IInventoryService
             {
                 if (i == maxRetries - 1) throw new InvalidOperationException("Failed to process stock movement due to concurrent updates.");
                 
-                _context.InventoryStockLevels.Local.Clear();
-                _context.InventoryMovements.Local.Clear();
-                _context.InventoryLots.Local.Clear();
+                ClearTrackedState();
                 await Task.Delay(Random.Shared.Next(50, 150));
             }
         }
@@ -697,4 +693,21 @@ public class InventoryService : IInventoryService
 
     private Task EnsurePermissionAsync(string permission) =>
         _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
+
+    private void ClearTrackedState()
+    {
+        if (_context is DbContext dbContext)
+        {
+            dbContext.ChangeTracker.Clear();
+            return;
+        }
+
+        _context.InventoryProfiles.Local.Clear();
+        _context.InventoryLocations.Local.Clear();
+        _context.InventoryLots.Local.Clear();
+        _context.InventoryMovements.Local.Clear();
+        _context.InventoryStockLevels.Local.Clear();
+        _context.Activities.Local.Clear();
+        _context.AuditLogs.Local.Clear();
+    }
 }

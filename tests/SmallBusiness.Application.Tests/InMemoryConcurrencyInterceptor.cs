@@ -18,30 +18,36 @@ public class InMemoryConcurrencyInterceptor : SaveChangesInterceptor
         var context = eventData.Context;
         if (context != null)
         {
-            var entries = context.ChangeTracker.Entries<InventoryStockLevel>()
-                .Where(e => e.State == EntityState.Modified)
-                .ToList();
-
-            foreach (var entry in entries)
+            foreach (var entry in context.ChangeTracker.Entries<InventoryStockLevel>().Where(e => e.State == EntityState.Modified))
             {
-                var originalRowVersion = entry.OriginalValues.GetValue<byte[]>("RowVersion");
-                var databaseEntry = entry.GetDatabaseValues();
-                
-                if (databaseEntry != null)
-                {
-                    var databaseRowVersion = databaseEntry.GetValue<byte[]>("RowVersion");
-                    
-                    if (originalRowVersion == null || databaseRowVersion == null || !originalRowVersion.SequenceEqual(databaseRowVersion))
-                    {
-                        throw new DbUpdateConcurrencyException("Concurrency conflict detected by interceptor.");
-                    }
-                }
-                
-                // Simulate updating the RowVersion in the database
-                entry.CurrentValues["RowVersion"] = Guid.NewGuid().ToByteArray();
+                CheckRowVersion(entry);
+            }
+
+            foreach (var entry in context.ChangeTracker.Entries<Invoice>().Where(e => e.State == EntityState.Modified))
+            {
+                CheckRowVersion(entry);
             }
         }
 
         return base.SavingChangesAsync(eventData, result, cancellationToken);
+    }
+
+    private static void CheckRowVersion(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+    {
+        var originalRowVersion = entry.OriginalValues.GetValue<byte[]>("RowVersion");
+        var databaseEntry = entry.GetDatabaseValues();
+
+        if (databaseEntry != null)
+        {
+            var databaseRowVersion = databaseEntry.GetValue<byte[]>("RowVersion");
+
+            if (originalRowVersion == null || databaseRowVersion == null || !originalRowVersion.SequenceEqual(databaseRowVersion))
+            {
+                throw new DbUpdateConcurrencyException("Concurrency conflict detected by interceptor.");
+            }
+        }
+
+        // Simulate SQL Server rowversion changing when a concurrency-protected row is updated.
+        entry.CurrentValues["RowVersion"] = Guid.NewGuid().ToByteArray();
     }
 }
