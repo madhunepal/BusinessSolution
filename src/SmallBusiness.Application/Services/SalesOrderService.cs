@@ -104,11 +104,10 @@ public class SalesOrderService : ISalesOrderService
             BusinessId = businessId,
             QuoteId = quote.Id,
             CustomerId = quote.CustomerId,
+            CustomerNumberSnapshot = quote.CustomerNumberSnapshot,
             CustomerNameSnapshot = quote.CustomerNameSnapshot,
-            // Follow the user's rule: copy snapshot values from the quote, NOT the current customer
-            CustomerNumberSnapshot = quote.Customer.CustomerNumber, // Wait, Quote didn't have NumberSnapshot. We will take it from Quote's navigation property for now safely since it's immutable there too, or if they changed it, we just grab it. But ideally Quote should have had it. 
-            CustomerEmailSnapshot = quote.Customer.Email,
-            CustomerPhoneSnapshot = quote.Customer.PhoneNumber,
+            CustomerEmailSnapshot = quote.CustomerEmailSnapshot,
+            CustomerPhoneSnapshot = quote.CustomerPhoneSnapshot,
             
             OrderDate = DateTime.Today,
             Status = SalesOrderStatus.Confirmed, // Direct to Confirmed!

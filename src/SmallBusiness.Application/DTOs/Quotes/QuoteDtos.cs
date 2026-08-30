@@ -9,7 +9,10 @@ public class QuoteDto
     public Guid BusinessId { get; set; }
     public string QuoteNumber { get; set; } = string.Empty;
     public Guid CustomerId { get; set; }
+    public string CustomerNumberSnapshot { get; set; } = string.Empty;
     public string CustomerNameSnapshot { get; set; } = string.Empty;
+    public string? CustomerEmailSnapshot { get; set; }
+    public string? CustomerPhoneSnapshot { get; set; }
     public DateTime QuoteDate { get; set; }
     public DateTime? ExpirationDate { get; set; }
     public QuoteStatus Status { get; set; }

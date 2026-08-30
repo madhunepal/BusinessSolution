@@ -13,7 +13,10 @@ public class Quote : BaseEntity, IHasBusinessId
     public Customer Customer { get; set; } = null!;
     
     // Customer Snapshot
+    public string CustomerNumberSnapshot { get; set; } = string.Empty;
     public string CustomerNameSnapshot { get; set; } = string.Empty;
+    public string? CustomerEmailSnapshot { get; set; }
+    public string? CustomerPhoneSnapshot { get; set; }
     
     public DateTime QuoteDate { get; set; }
     public DateTime? ExpirationDate { get; set; }

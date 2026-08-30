@@ -52,7 +52,10 @@ public class QuoteService : IQuoteService
             BusinessId = businessId,
             QuoteNumber = quoteNumber,
             CustomerId = customer.Id,
+            CustomerNumberSnapshot = customer.CustomerNumber,
             CustomerNameSnapshot = customer.Name,
+            CustomerEmailSnapshot = customer.Email,
+            CustomerPhoneSnapshot = customer.PhoneNumber,
             QuoteDate = request.QuoteDate,
             ExpirationDate = request.ExpirationDate,
             Status = QuoteStatus.Draft,
@@ -97,7 +100,10 @@ public class QuoteService : IQuoteService
         }
 
         quote.CustomerId = customer.Id;
+        quote.CustomerNumberSnapshot = customer.CustomerNumber;
         quote.CustomerNameSnapshot = customer.Name;
+        quote.CustomerEmailSnapshot = customer.Email;
+        quote.CustomerPhoneSnapshot = customer.PhoneNumber;
         quote.QuoteDate = request.QuoteDate;
         quote.ExpirationDate = request.ExpirationDate;
         quote.Notes = request.Notes;
@@ -335,7 +341,10 @@ public class QuoteService : IQuoteService
             BusinessId = q.BusinessId,
             QuoteNumber = q.QuoteNumber,
             CustomerId = q.CustomerId,
+            CustomerNumberSnapshot = q.CustomerNumberSnapshot,
             CustomerNameSnapshot = q.CustomerNameSnapshot,
+            CustomerEmailSnapshot = q.CustomerEmailSnapshot,
+            CustomerPhoneSnapshot = q.CustomerPhoneSnapshot,
             QuoteDate = q.QuoteDate,
             ExpirationDate = q.ExpirationDate,
             Status = q.Status,

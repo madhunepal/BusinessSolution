@@ -17,8 +17,17 @@ public class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.HasIndex(x => new { x.BusinessId, x.QuoteNumber })
             .IsUnique();
 
+        builder.Property(x => x.CustomerNumberSnapshot)
+            .HasMaxLength(50);
+
         builder.Property(x => x.CustomerNameSnapshot)
             .HasMaxLength(200);
+
+        builder.Property(x => x.CustomerEmailSnapshot)
+            .HasMaxLength(200);
+
+        builder.Property(x => x.CustomerPhoneSnapshot)
+            .HasMaxLength(50);
 
         builder.Property(x => x.Notes)
             .HasMaxLength(4000);
