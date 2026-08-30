@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmallBusiness.Application.T
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmallBusiness.Web.Tests", "tests\SmallBusiness.Web.Tests\SmallBusiness.Web.Tests.csproj", "{6418A7C1-F19F-44F9-A0C2-613A188F9E99}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmallBusiness.IntegrationTests", "tests\SmallBusiness.IntegrationTests\SmallBusiness.IntegrationTests.csproj", "{2C43C434-0324-46AE-9292-5D4A947E98F5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,6 +60,10 @@ Global
 		{6418A7C1-F19F-44F9-A0C2-613A188F9E99}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6418A7C1-F19F-44F9-A0C2-613A188F9E99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6418A7C1-F19F-44F9-A0C2-613A188F9E99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C43C434-0324-46AE-9292-5D4A947E98F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C43C434-0324-46AE-9292-5D4A947E98F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C43C434-0324-46AE-9292-5D4A947E98F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C43C434-0324-46AE-9292-5D4A947E98F5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{491B984E-BA72-418F-90DA-702DFCE7C1DB} = {45A436A0-E318-4896-B08C-2D7CAFB340AF}
@@ -67,5 +73,6 @@ Global
 		{3B887198-0FC3-4AC1-8DCB-F5BFBA0DDE08} = {968AC056-5C38-40BC-A198-B3BE77D797C3}
 		{40E5AA5C-6C81-45EE-AEE4-ABF8516B921F} = {968AC056-5C38-40BC-A198-B3BE77D797C3}
 		{6418A7C1-F19F-44F9-A0C2-613A188F9E99} = {968AC056-5C38-40BC-A198-B3BE77D797C3}
+		{2C43C434-0324-46AE-9292-5D4A947E98F5} = {968AC056-5C38-40BC-A198-B3BE77D797C3}
 	EndGlobalSection
 EndGlobal
