@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
+using Microsoft.EntityFrameworkCore;
+using SmallBusiness.Application.Interfaces;
 using SmallBusiness.Web.Components.Account.Pages;
 using SmallBusiness.Web.Components.Account.Pages.Manage;
 using SmallBusiness.Infrastructure.Identity;
@@ -48,6 +50,46 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             await signInManager.SignOutAsync();
             return TypedResults.LocalRedirect($"~/{returnUrl}");
         });
+
+        accountGroup.MapGet("/SelectBusiness", async (
+            HttpContext context,
+            [FromServices] UserManager<ApplicationUser> userManager,
+            [FromServices] SignInManager<ApplicationUser> signInManager,
+            [FromServices] IApplicationDbContext dbContext,
+            [FromQuery] Guid businessId,
+            [FromQuery] string? returnUrl) =>
+        {
+            var user = await userManager.GetUserAsync(context.User);
+            if (user is null)
+            {
+                return Results.Challenge();
+            }
+
+            var hasActiveMembership = await dbContext.BusinessUsers
+                .IgnoreQueryFilters()
+                .AnyAsync(bu => bu.BusinessId == businessId && bu.UserId == user.Id && bu.IsActive);
+            var isSysAdmin = context.User.HasClaim(c => c.Type == ClaimTypes.Role && c.Value == "SysAdmin");
+            var businessExists = await dbContext.Businesses
+                .IgnoreQueryFilters()
+                .AnyAsync(b => b.Id == businessId);
+
+            if ((!hasActiveMembership && !isSysAdmin) || !businessExists)
+            {
+                return Results.Forbid();
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            var existingClaim = claims.FirstOrDefault(c => c.Type == "BusinessId");
+            if (existingClaim is not null)
+            {
+                await userManager.RemoveClaimAsync(user, existingClaim);
+            }
+
+            await userManager.AddClaimAsync(user, new Claim("BusinessId", businessId.ToString()));
+            await signInManager.RefreshSignInAsync(user);
+
+            return TypedResults.LocalRedirect($"~/{NormalizeLocalReturnUrl(returnUrl)}");
+        }).RequireAuthorization();
 
         var manageGroup = accountGroup.MapGroup("/Manage").RequireAuthorization();
 
@@ -108,5 +150,20 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
         });
 
         return accountGroup;
+    }
+
+    private static string NormalizeLocalReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return "dashboard";
+        }
+
+        if (!Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
+        {
+            return "dashboard";
+        }
+
+        return returnUrl.TrimStart('/');
     }
 }

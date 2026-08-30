@@ -1,0 +1,24 @@
+<AuthorizeView>
+    <Authorized>
+        <a href="@PrimaryUrl" class="@PrimaryCss">@PrimaryText</a>
+        <a href="/dashboard" class="@SecondaryCss">Dashboard</a>
+    </Authorized>
+    <NotAuthorized>
+        <a href="/Account/Register" class="@PrimaryCss">Get Started</a>
+        <a href="/Account/Login" class="@SecondaryCss">Log in</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter]
+    public string PrimaryText { get; set; } = "Dashboard";
+
+    [Parameter]
+    public string PrimaryUrl { get; set; } = "/dashboard";
+
+    [Parameter]
+    public string PrimaryCss { get; set; } = "btn btn-primary btn-lg me-2";
+
+    [Parameter]
+    public string SecondaryCss { get; set; } = "btn btn-outline-primary btn-lg";
+}

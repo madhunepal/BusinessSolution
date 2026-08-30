@@ -2,55 +2,46 @@
 @using SmallBusiness.Application.Interfaces
 @inject ITenantContext TenantContext
 
-<div class="page">
-    <div class="sidebar">
+<AuthorizeView>
+    <Authorized>
         @if (TenantContext.CurrentBusinessId != null)
         {
-            <NavMenu />
-        }
-    </div>
+            <div class="page">
+                <div class="sidebar">
+                    <NavMenu />
+                </div>
 
-    <main>
-        <div class="top-row px-4 d-flex justify-content-between align-items-center">
-            <div>
-                @if (TenantContext.CurrentBusinessId != null)
-                {
-                    <span class="badge bg-primary me-2">Business: @TenantContext.CurrentBusinessId</span>
-                }
-                else
-                {
-                    <span class="badge bg-warning text-dark me-2">No Business Selected</span>
-                }
-            </div>
-            <div>
-                <AuthorizeView>
-                    <Authorized>
+                <main>
+                    <div class="top-row px-4 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-primary me-2">Business: @TenantContext.CurrentBusinessId</span>
+                        </div>
+                        <div>
                         <span class="text-muted me-3">@context.User.Identity?.Name</span>
                         <form method="post" action="/Account/Logout" class="d-inline">
                             <AntiforgeryToken />
                             <input type="hidden" name="ReturnUrl" value="/" />
                             <button type="submit" class="btn btn-outline-secondary btn-sm">Logout</button>
                         </form>
-                    </Authorized>
-                </AuthorizeView>
-            </div>
-        </div>
+                        </div>
+                    </div>
 
-        <article class="content px-4">
-            @if (TenantContext.CurrentBusinessId != null)
-            {
+                    <article class="content px-4">
+                        @Body
+                    </article>
+                </main>
+            </div>
+        }
+        else
+        {
+            <RedirectToOnboarding />
+        }
+    </Authorized>
+    <NotAuthorized>
+        <main>
+            <article class="content px-4">
                 @Body
-            }
-            else
-            {
-                <div class="alert alert-warning mt-4">
-                    <h4>No Business Context</h4>
-                    <p>You must select or configure a business before you can access the application.</p>
-                    <p class="mb-0">Please contact your administrator or set up a new business profile.</p>
-                </div>
-                
-                <SmallBusiness.Web.Components.Shared.BusinessSelector />
-            }
-        </article>
-    </main>
-</div>
+            </article>
+        </main>
+    </NotAuthorized>
+</AuthorizeView>

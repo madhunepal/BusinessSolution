@@ -1,8 +1,11 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using SmallBusiness.Application.Interfaces;
 using SmallBusiness.Application.Services;
 using SmallBusiness.Infrastructure.Data;
+using SmallBusiness.Infrastructure.Services;
 
 namespace SmallBusiness.Application.Tests;
 
@@ -69,6 +72,36 @@ public class BusinessServiceTests
             .SingleAsync(bu => bu.BusinessId == result.Value && bu.UserId == "new-user");
         Assert.Equal("Owner", membership.Role);
         Assert.True(membership.IsActive);
+    }
+
+    [Fact]
+    public async Task CreateBusinessForUserAsync_WithActiveClaim_ResolvesEffectiveTenant()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+        var setupTenant = new Mock<ITenantContext>();
+        setupTenant.Setup(x => x.CurrentBusinessId).Returns((Guid?)null);
+        await using var context = new ApplicationDbContext(options, setupTenant.Object);
+        var service = new BusinessService(context, setupTenant.Object);
+
+        var result = await service.CreateBusinessForUserAsync("new-user", "First Business");
+        Assert.True(result.Succeeded);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, "new-user"),
+                    new Claim("BusinessId", result.Value.ToString())
+                ],
+                "TestAuth"))
+        };
+        var accessor = new Mock<IHttpContextAccessor>();
+        accessor.Setup(x => x.HttpContext).Returns(httpContext);
+        var tenantContext = new TenantContextService(accessor.Object, options);
+
+        Assert.Equal(result.Value, tenantContext.CurrentBusinessId);
     }
 
     [Fact]

@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+
+<div class="onboarding-layout min-vh-100 bg-light">
+    <header class="border-bottom bg-white">
+        <div class="container py-3 d-flex justify-content-between align-items-center gap-3">
+            <a class="navbar-brand fw-bold text-decoration-none" href="/">
+                <span class="text-primary">SBMS</span> <span class="text-dark">Small Business Management</span>
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/" class="btn btn-outline-secondary btn-sm">Back to Home</a>
+                <form method="post" action="/Account/Logout" class="d-inline">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="/" />
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Sign out</button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <main class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                @Body
+            </div>
+        </div>
+    </main>
+</div>

@@ -1,0 +1,24 @@
+@page "/onboarding/business"
+@layout SmallBusiness.Web.Components.Layout.OnboardingLayout
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using SmallBusiness.Application.Interfaces
+@inject ITenantContext TenantContext
+@inject NavigationManager NavigationManager
+
+<PageTitle>Set up your business — SBMS</PageTitle>
+
+@if (TenantContext.CurrentBusinessId is null)
+{
+    <BusinessSelector OnboardingMode="true" SuccessUrl="/dashboard" />
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (TenantContext.CurrentBusinessId is not null)
+        {
+            NavigationManager.NavigateTo("/dashboard", forceLoad: true);
+        }
+    }
+}

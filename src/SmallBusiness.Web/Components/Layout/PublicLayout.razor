@@ -1,4 +1,8 @@
 @inherits LayoutComponentBase
+@using Microsoft.EntityFrameworkCore
+@using SmallBusiness.Application.Interfaces
+@inject ITenantContext TenantContext
+@inject IApplicationDbContext DbContext
 
 <div class="public-layout">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
@@ -34,11 +38,41 @@
                 <div class="d-flex align-items-center gap-2">
                     <AuthorizeView>
                         <Authorized>
-                            <a href="/dashboard" class="btn btn-outline-light btn-sm">Go to Dashboard</a>
+                            @if (TenantContext.CurrentBusinessId is not null)
+                            {
+                                <span class="badge text-bg-light">@(_businessName ?? "Business")</span>
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        @context.User.Identity?.Name
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
+                                        <li><a class="dropdown-item" href="/Account/Manage">Account/Profile</a></li>
+                                        <li><a class="dropdown-item" href="/onboarding/business">Switch Business</a></li>
+                                        <li><hr class="dropdown-divider" /></li>
+                                        <li>
+                                            <form method="post" action="/Account/Logout">
+                                                <AntiforgeryToken />
+                                                <input type="hidden" name="ReturnUrl" value="/" />
+                                                <button type="submit" class="dropdown-item">Log out</button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                            }
+                            else
+                            {
+                                <a href="/onboarding/business" class="btn btn-outline-light btn-sm">Set up business</a>
+                                <form method="post" action="/Account/Logout" class="d-inline">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="ReturnUrl" value="/" />
+                                    <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+                                </form>
+                            }
                         </Authorized>
                         <NotAuthorized>
-                            <a href="/Account/Login" class="btn btn-primary btn-sm">Log in</a>
-                            <a href="/Account/Register" class="btn btn-outline-light btn-sm">Register</a>
+                            <a href="/Account/Login" class="btn btn-outline-light btn-sm">Log in</a>
+                            <a href="/Account/Register" class="btn btn-primary btn-sm">Get Started</a>
                         </NotAuthorized>
                     </AuthorizeView>
                 </div>
@@ -56,3 +90,19 @@
         </div>
     </footer>
 </div>
+
+@code {
+    private string? _businessName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (TenantContext.CurrentBusinessId is Guid businessId)
+        {
+            _businessName = await DbContext.Businesses
+                .IgnoreQueryFilters()
+                .Where(b => b.Id == businessId)
+                .Select(b => b.Name)
+                .FirstOrDefaultAsync();
+        }
+    }
+}

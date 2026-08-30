@@ -28,12 +28,28 @@ public class BusinessService
         string? email = null,
         CancellationToken cancellationToken = default)
     {
+        var userId = _tenantContext.UserId;
+        if (userId is null)
+        {
+            return Result.Failure<Guid>("User must be authenticated to create a business.");
+        }
+
+        return await CreateBusinessForUserAsync(userId, name, phone, email, cancellationToken);
+    }
+
+    public async Task<Result<Guid>> CreateBusinessForUserAsync(
+        string userId,
+        string name,
+        string? phone = null,
+        string? email = null,
+        CancellationToken cancellationToken = default)
+    {
         if (string.IsNullOrWhiteSpace(name))
         {
             return Result.Failure<Guid>("Business name is required.");
         }
 
-        if (_tenantContext.UserId is null)
+        if (string.IsNullOrWhiteSpace(userId))
         {
             return Result.Failure<Guid>("User must be authenticated to create a business.");
         }
@@ -52,7 +68,7 @@ public class BusinessService
         {
             Id = Guid.NewGuid(),
             BusinessId = business.Id,
-            UserId = _tenantContext.UserId,
+            UserId = userId,
             Role = "Owner",
             IsActive = true,
             CreatedAt = DateTime.UtcNow
