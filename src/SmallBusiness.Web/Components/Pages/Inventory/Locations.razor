@@ -1,0 +1,152 @@
+@page "/inventory/locations"
+@using Microsoft.AspNetCore.Authorization
+@using SmallBusiness.Application.DTOs.Inventory
+@using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Infrastructure.Identity
+@inject IInventoryService InventoryService
+@attribute [Authorize(Policy = Permissions.InventoryManage)]
+
+<PageTitle>Inventory Locations</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Inventory Locations</h1>
+    <button class="btn btn-primary" @onclick="ShowAddModal">Add Location</button>
+</div>
+
+@if (_locations == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!_locations.Any())
+{
+    <div class="alert alert-info">No locations found.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Default</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var loc in _locations)
+                    {
+                        <tr>
+                            <td>@loc.Name</td>
+                            <td>@loc.Description</td>
+                            <td>
+                                @if (loc.IsDefault)
+                                {
+                                    <span class="badge bg-primary">Default</span>
+                                }
+                            </td>
+                            <td>
+                                @if (loc.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (_showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Location</h5>
+                    <button type="button" class="btn-close" @onclick="HideModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <InputText @bind-Value="_model.Name" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputText @bind-Value="_model.Description" class="form-control" />
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox @bind-Value="_model.IsDefault" class="form-check-input" id="isDefaultCheck" />
+                            <label class="form-check-label" for="isDefaultCheck">Make Default Location</label>
+                        </div>
+                        
+                        <div class="modal-footer px-0 pb-0">
+                            <button type="button" class="btn btn-secondary" @onclick="HideModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                                @if (_isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Save Location
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<InventoryLocationDto>? _locations;
+    private bool _showModal;
+    private bool _isSubmitting;
+    private CreateInventoryLocationDto _model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+    
+    private async Task LoadDataAsync()
+    {
+        _locations = await InventoryService.GetLocationsAsync();
+    }
+
+    private void ShowAddModal()
+    {
+        _model = new CreateInventoryLocationDto();
+        _showModal = true;
+    }
+
+    private void HideModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _isSubmitting = true;
+        try
+        {
+            await InventoryService.CreateLocationAsync(_model);
+            _showModal = false;
+            await LoadDataAsync();
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+}

@@ -2,6 +2,7 @@
 @using SmallBusiness.Application.Interfaces
 @using SmallBusiness.Application.DTOs.CatalogItems
 @inject ICatalogItemService CatalogItemService
+@inject SmallBusiness.Application.Interfaces.IInventoryService InventoryService
 @inject NavigationManager NavigationManager
 @rendermode InteractiveServer
 
@@ -117,7 +118,25 @@ else
             </div>
         </div>
         
+        
         <div class="col-lg-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Inventory</h5>
+                </div>
+                <div class="card-body">
+                    @if (_item.Type == SmallBusiness.Domain.Enums.CatalogItemType.Product)
+                    {
+                        <p class="text-muted small">Enable inventory tracking for this product to manage stock levels across locations.</p>
+                        <button class="btn btn-primary w-100" @onclick="EnableInventory">Enable Inventory Tracking</button>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Inventory tracking is only available for Products.</p>
+                    }
+                </div>
+            </div>
+
             <!-- Future space for Activity Timeline -->
             <div class="card shadow-sm border-0 bg-light">
                 <div class="card-body text-center text-muted p-5">
@@ -130,6 +149,27 @@ else
 }
 
 @code {
+    private async Task EnableInventory()
+    {
+        try
+        {
+            await InventoryService.CreateInventoryProfileAsync(new SmallBusiness.Application.DTOs.Inventory.CreateInventoryProfileDto
+            {
+                CatalogItemId = Id,
+                ReorderLevel = 0,
+                TrackLots = false,
+                TrackExpiration = false,
+                AllowNegativeStock = false
+            });
+            NavigationManager.NavigateTo($"/inventory");
+        }
+        catch (Exception ex)
+        {
+            // Just ignore for now or show error
+            Console.WriteLine(ex.Message);
+        }
+    }
+
     [Parameter]
     public Guid Id { get; set; }
 

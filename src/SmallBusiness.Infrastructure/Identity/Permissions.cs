@@ -46,6 +46,9 @@ public static class Permissions
     // Inventory
     public const string InventoryView = "Inventory.View";
     public const string InventoryManage = "Inventory.Manage";
+    public const string InventoryReceive = "Inventory.Receive";
+    public const string InventoryAdjust = "Inventory.Adjust";
+    public const string InventoryTransfer = "Inventory.Transfer";
 
     // People
     public const string EmployeesView = "Employees.View";
@@ -68,7 +71,7 @@ public static class Permissions
         ScheduleView, ScheduleManage,
         InvoicesView, InvoicesCreate,
         PaymentsView, PaymentsRecord,
-        InventoryView, InventoryManage,
+        InventoryView, InventoryManage, InventoryReceive, InventoryAdjust, InventoryTransfer,
         EmployeesView, EmployeesManage,
         ReportsView
     ];

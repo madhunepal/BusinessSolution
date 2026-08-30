@@ -28,6 +28,11 @@ public interface IApplicationDbContext
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceLine> InvoiceLines { get; }
     DbSet<Payment> Payments { get; }
+    DbSet<InventoryProfile> InventoryProfiles { get; }
+    DbSet<InventoryLocation> InventoryLocations { get; }
+    DbSet<InventoryLot> InventoryLots { get; }
+    DbSet<InventoryMovement> InventoryMovements { get; }
+    DbSet<InventoryStockLevel> InventoryStockLevels { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

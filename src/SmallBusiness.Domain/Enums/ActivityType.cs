@@ -13,5 +13,10 @@ public enum ActivityType
     Rejected = 9,
     Converted = 10,
     PaymentReceived = 11,
-    InvoiceIssued = 12
+    InvoiceIssued = 12,
+    StockReceived = 13,
+    StockAdjusted = 14,
+    StockUsed = 15,
+    StockWasted = 16,
+    StockTransferred = 17
 }
