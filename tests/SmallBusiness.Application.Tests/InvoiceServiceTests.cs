@@ -117,7 +117,8 @@ public class InvoiceServiceTests : IDisposable
             SalesOrderId = order.Id,
             Status = InvoiceStatus.Sent,
             InvoiceNumber = "INV-000001",
-            Subtotal = 100, Total = 100
+            Subtotal = 100, Total = 100,
+            RowVersion = new byte[8]
         };
         _context.Invoices.Add(existingInvoice);
         await _context.SaveChangesAsync();
@@ -146,7 +147,8 @@ public class InvoiceServiceTests : IDisposable
             SalesOrderId = order.Id,
             Status = InvoiceStatus.Void,
             InvoiceNumber = "INV-VOID",
-            Subtotal = 0, Total = 0
+            Subtotal = 0, Total = 0,
+            RowVersion = new byte[8]
         };
         _context.Invoices.Add(voidInvoice);
         await _context.SaveChangesAsync();
@@ -172,7 +174,8 @@ public class InvoiceServiceTests : IDisposable
             SalesOrderId = so.Id,
             Status = InvoiceStatus.Draft,
             InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
-            DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(15))
+            DueDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(15)),
+            RowVersion = new byte[8]
         };
         _context.Invoices.Add(invoice);
         await _context.SaveChangesAsync();
@@ -208,7 +211,8 @@ public class InvoiceServiceTests : IDisposable
             BusinessId = _businessId,
             SalesOrderId = so.Id,
             Status = InvoiceStatus.Draft,
-            InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow)
+            InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            RowVersion = new byte[8]
         };
         _context.Invoices.Add(invoice);
         await _context.SaveChangesAsync();
@@ -231,7 +235,8 @@ public class InvoiceServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             BusinessId = _businessId,
-            Status = InvoiceStatus.Draft
+            Status = InvoiceStatus.Draft,
+            RowVersion = new byte[8]
         };
         _context.Invoices.Add(invoice);
         await _context.SaveChangesAsync();
@@ -253,7 +258,8 @@ public class InvoiceServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             BusinessId = _businessId,
-            Status = InvoiceStatus.Sent
+            Status = InvoiceStatus.Sent,
+            RowVersion = new byte[8]
         };
         _context.Invoices.Add(invoice);
         await _context.SaveChangesAsync();
@@ -283,13 +289,15 @@ public class InvoiceServiceTests : IDisposable
         {
             Id = Guid.NewGuid(), BusinessId = _businessId, SalesOrderId = so.Id, Status = InvoiceStatus.Sent,
             InvoiceDate = today.AddDays(-30), DueDate = today.AddDays(-1),
-            Total = 100, BalanceDue = 100
+            Total = 100, BalanceDue = 100,
+            RowVersion = new byte[8]
         };
         var notOverdue = new Invoice
         {
             Id = Guid.NewGuid(), BusinessId = _businessId, SalesOrderId = so.Id, Status = InvoiceStatus.Sent,
             InvoiceDate = today, DueDate = today.AddDays(15),
-            Total = 100, BalanceDue = 100
+            Total = 100, BalanceDue = 100,
+            RowVersion = new byte[8]
         };
         
         _context.Invoices.AddRange(overdue, notOverdue);

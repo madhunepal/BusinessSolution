@@ -40,5 +40,9 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.Total).HasPrecision(18, 2);
         builder.Property(i => i.AmountPaid).HasPrecision(18, 2);
         builder.Property(i => i.BalanceDue).HasPrecision(18, 2);
+
+        builder.Property(i => i.RowVersion)
+            .IsRowVersion()
+            .IsRequired();
     }
 }

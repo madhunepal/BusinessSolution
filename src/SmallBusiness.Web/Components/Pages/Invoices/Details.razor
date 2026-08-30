@@ -1,9 +1,11 @@
 @page "/invoices/{id:guid}"
 @using SmallBusiness.Application.DTOs.Invoices
+@using SmallBusiness.Application.DTOs.Payments
 @using SmallBusiness.Application.Interfaces
 @using SmallBusiness.Domain.Enums
 @using System.ComponentModel.DataAnnotations
 @inject IInvoiceService InvoiceService
+@inject IPaymentService PaymentService
 @inject NavigationManager Navigation
 
 <PageTitle>Invoice Details</PageTitle>
@@ -23,6 +25,8 @@ else
                     {
                         InvoiceStatus.Draft => "bg-secondary",
                         InvoiceStatus.Sent => _invoice.IsOverdue ? "bg-danger" : "bg-primary",
+                        InvoiceStatus.PartiallyPaid => "bg-info text-dark",
+                        InvoiceStatus.Paid => "bg-success",
                         InvoiceStatus.Void => "bg-dark",
                         _ => "bg-secondary"
                     };
@@ -41,8 +45,9 @@ else
                 <button class="btn btn-primary" @onclick="SendInvoice">Mark as Sent</button>
                 <button class="btn btn-danger" @onclick="VoidInvoice">Void Invoice</button>
             }
-            else if (_invoice.Status == InvoiceStatus.Sent)
+            else if (_invoice.Status == InvoiceStatus.Sent || _invoice.Status == InvoiceStatus.PartiallyPaid)
             {
+                <button class="btn btn-success" @onclick="OpenPaymentModal">Record Payment</button>
                 <button class="btn btn-danger" @onclick="VoidInvoice">Void Invoice</button>
             }
         </div>
@@ -167,6 +172,54 @@ else
             }
         </div>
     </div>
+    
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Payments</h5>
+            @if (_invoice.Status == InvoiceStatus.Sent || _invoice.Status == InvoiceStatus.PartiallyPaid)
+            {
+                <button class="btn btn-sm btn-outline-success" @onclick="OpenPaymentModal">Record Payment</button>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (_payments == null)
+            {
+                <div class="p-3"><em>Loading payments...</em></div>
+            }
+            else if (!_payments.Any())
+            {
+                <div class="p-3 text-muted">No payments recorded yet.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Payment #</th>
+                                <th>Date</th>
+                                <th>Method</th>
+                                <th>Reference</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in _payments)
+                            {
+                                <tr>
+                                    <td><strong>@p.PaymentNumber</strong></td>
+                                    <td>@p.PaymentDate.ToString("d")</td>
+                                    <td>@p.Method</td>
+                                    <td>@p.ReferenceNumber</td>
+                                    <td class="text-end"><strong>@p.Amount.ToString("C")</strong></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @if (_showEditModal && _invoice != null)
@@ -209,14 +262,77 @@ else
     </div>
 }
 
+@if (_showPaymentModal && _invoice != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Record Payment</h5>
+                    <button type="button" class="btn-close" @onclick="ClosePaymentModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@_paymentModel" OnValidSubmit="SavePayment">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Payment Date</label>
+                            <InputDate @bind-Value="_paymentModel.PaymentDate" class="form-control" />
+                            <ValidationMessage For="@(() => _paymentModel.PaymentDate)" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Amount</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <InputNumber @bind-Value="_paymentModel.Amount" class="form-control" />
+                            </div>
+                            <ValidationMessage For="@(() => _paymentModel.Amount)" />
+                            <small class="text-muted">Balance Due: @_invoice.BalanceDue.ToString("C")</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method</label>
+                            <InputSelect @bind-Value="_paymentModel.Method" class="form-select">
+                                @foreach (var method in Enum.GetValues<PaymentMethod>())
+                                {
+                                    <option value="@method">@method</option>
+                                }
+                            </InputSelect>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Reference Number</label>
+                            <InputText @bind-Value="_paymentModel.ReferenceNumber" class="form-control" placeholder="Check #, Bank Ref, etc." />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <InputTextArea @bind-Value="_paymentModel.Notes" class="form-control" rows="2" />
+                        </div>
+                        
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-secondary" @onclick="ClosePaymentModal">Cancel</button>
+                            <button type="submit" class="btn btn-success">Record Payment</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter]
     public Guid Id { get; set; }
 
     private InvoiceDto? _invoice;
+    private List<PaymentDto>? _payments;
     private string? _errorMessage;
     private bool _showEditModal;
+    private bool _showPaymentModal;
     private UpdateInvoiceMetadataRequest _editModel = new();
+    private CreatePaymentDto _paymentModel = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -229,6 +345,7 @@ else
         {
             _errorMessage = null;
             _invoice = await InvoiceService.GetInvoiceAsync(Id);
+            _payments = await PaymentService.GetPaymentsForInvoiceAsync(Id);
         }
         catch (Exception ex)
         {
@@ -293,6 +410,40 @@ else
         catch (Exception ex)
         {
             _errorMessage = ex.Message;
+        }
+    }
+
+    private void OpenPaymentModal()
+    {
+        if (_invoice == null) return;
+        
+        _paymentModel = new CreatePaymentDto
+        {
+            InvoiceId = _invoice.Id,
+            Amount = _invoice.BalanceDue,
+            PaymentDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            Method = PaymentMethod.Check
+        };
+        _showPaymentModal = true;
+    }
+
+    private void ClosePaymentModal()
+    {
+        _showPaymentModal = false;
+    }
+
+    private async Task SavePayment()
+    {
+        try
+        {
+            await PaymentService.CreatePaymentAsync(_paymentModel);
+            _showPaymentModal = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+            _showPaymentModal = false;
         }
     }
 }

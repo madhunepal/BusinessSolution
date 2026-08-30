@@ -44,13 +44,17 @@ public class Invoice : BaseEntity, IHasBusinessId
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
 
-    // Phase 7 Payments conceptual state
-    public decimal AmountPaid { get; set; } // Will be 0 in Phase 7
-    public decimal BalanceDue { get; set; } // Will equal Total in Phase 7
+    // Denormalized settlement state — updated transactionally by PaymentService
+    public decimal AmountPaid { get; set; }
+    public decimal BalanceDue { get; set; }
 
     // Lifecycle
     public DateTimeOffset? SentAt { get; set; }
+    public DateTimeOffset? PaidAt { get; set; }
     public DateTimeOffset? VoidedAt { get; set; }
 
     public ICollection<InvoiceLine> Lines { get; set; } = new List<InvoiceLine>();
+    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+
+    public byte[] RowVersion { get; set; } = null!;
 }

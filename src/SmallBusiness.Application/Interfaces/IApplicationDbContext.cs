@@ -27,6 +27,7 @@ public interface IApplicationDbContext
     DbSet<AppointmentAssignment> AppointmentAssignments { get; }
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceLine> InvoiceLines { get; }
+    DbSet<Payment> Payments { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

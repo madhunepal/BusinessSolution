@@ -68,7 +68,8 @@ public class InvoiceService : IInvoiceService
             Terms = "Net 15",
             Status = InvoiceStatus.Draft,
             TaxRate = salesOrder.TaxRate,
-            DiscountAmount = salesOrder.DiscountAmount
+            DiscountAmount = salesOrder.DiscountAmount,
+            RowVersion = new byte[8]
         };
 
         decimal subtotal = 0;

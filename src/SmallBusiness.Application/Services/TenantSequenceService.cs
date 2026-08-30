@@ -14,6 +14,7 @@ public interface ITenantSequenceService
     Task<string> GetNextSalesOrderNumberAsync();
     Task<string> GetNextJobNumberAsync();
     Task<string> GetNextInvoiceNumberAsync();
+    Task<string> GetNextPaymentNumberAsync();
 }
 
 public class TenantSequenceService : ITenantSequenceService
@@ -55,6 +56,11 @@ public class TenantSequenceService : ITenantSequenceService
     public Task<string> GetNextInvoiceNumberAsync()
     {
         return GenerateNextSequenceAsync("Invoice", "INV-");
+    }
+
+    public Task<string> GetNextPaymentNumberAsync()
+    {
+        return GenerateNextSequenceAsync("Payment", "PAY-");
     }
 
     private async Task<string> GenerateNextSequenceAsync(string entityType, string prefix)
