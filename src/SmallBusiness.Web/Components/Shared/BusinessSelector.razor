@@ -44,9 +44,9 @@
         <hr />
         
         <h6>Create a New Business</h6>
-        <form @onsubmit="CreateBusinessAsync" class="d-flex gap-2">
+        <form @onsubmit="CreateBusinessAsync" @onsubmit:preventDefault="true" class="d-flex gap-2">
             <input type="text" class="form-control" placeholder="Business Name" @bind="_newBusinessName" required />
-            <button type="submit" class="btn btn-success">Create</button>
+            <button type="button" class="btn btn-success" @onclick="CreateBusinessAsync">Create</button>
         </form>
     </div>
 </div>

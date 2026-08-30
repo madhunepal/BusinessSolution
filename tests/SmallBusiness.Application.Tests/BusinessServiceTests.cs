@@ -52,6 +52,26 @@ public class BusinessServiceTests
     }
 
     [Fact]
+    public async Task CreateBusinessAsync_WithNoCurrentBusiness_CreatesActiveOwnerMembership()
+    {
+        await using var context = CreateInMemoryContext();
+        var currentUser = new Mock<ITenantContext>();
+        currentUser.Setup(x => x.UserId).Returns("new-user");
+        currentUser.Setup(x => x.CurrentBusinessId).Returns((Guid?)null);
+
+        var service = new BusinessService(context, currentUser.Object);
+
+        var result = await service.CreateBusinessAsync("First Business");
+
+        Assert.True(result.Succeeded);
+        var membership = await context.BusinessUsers
+            .IgnoreQueryFilters()
+            .SingleAsync(bu => bu.BusinessId == result.Value && bu.UserId == "new-user");
+        Assert.Equal("Owner", membership.Role);
+        Assert.True(membership.IsActive);
+    }
+
+    [Fact]
     public async Task CreateBusinessAsync_WithEmptyName_Fails()
     {
         // Arrange
