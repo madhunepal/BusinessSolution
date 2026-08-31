@@ -64,3 +64,20 @@ Customer
 Do not ask the agent to build the whole ERP/CRM/SMB system in one prompt.
 
 Build one vertical slice at a time.
+
+## Deployment Configuration
+
+The application uses the `DefaultConnection` connection string name in every environment.
+
+For local development with SQL Server in Docker, provide secrets outside source control:
+
+```bash
+export MSSQL_SA_PASSWORD='<local strong password>'
+docker compose up -d
+export ConnectionStrings__DefaultConnection='Server=localhost,1433;Database=SmallBusinessDb;User Id=sa;Password=<local strong password>;TrustServerCertificate=True'
+dotnet run --project src/SmallBusiness.Web
+```
+
+For Azure Sandbox/App Service, set `ConnectionStrings__DefaultConnection` in App Service configuration to the Azure SQL Database connection string. Do not store SQL passwords, publish profiles, `.env` files, or Azure connection strings in the repository.
+
+Run EF Core migrations as an explicit deployment step, preferably with a migration bundle or manual migration command against the sandbox database. The web app does not run migrations automatically at startup.

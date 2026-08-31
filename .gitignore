@@ -5,6 +5,9 @@ obj/
 *.user
 *.suo
 appsettings.Development.json
+appsettings.*.local.json
+*.pubxml
+*.publishsettings
 .env
 .env.*
 secrets/

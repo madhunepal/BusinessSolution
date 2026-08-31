@@ -44,6 +44,25 @@ public class ApplicationDbContextFactoryResolutionTests
     }
 
     [Fact]
+    public void AddInfrastructure_MissingDefaultConnection_FailsWithDeploymentFriendlyMessage()
+    {
+        var tenantContext = new Mock<ITenantContext>();
+        var configuration = new ConfigurationBuilder().Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(tenantContext.Object);
+        services.AddInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            provider.GetRequiredService<ApplicationDbContext>());
+        Assert.Contains("Connection string 'DefaultConnection' is not configured", exception.Message);
+        Assert.Contains("ConnectionStrings__DefaultConnection", exception.Message);
+    }
+
+    [Fact]
     public async Task DbContextFactory_CreatedContextUsesRegisteredTenantContextForFilters()
     {
         var businessA = Guid.NewGuid();

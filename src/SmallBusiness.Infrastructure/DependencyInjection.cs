@@ -23,8 +23,15 @@ public static class DependencyInjection
     {
         static void ConfigureSqlServer(DbContextOptionsBuilder options, IConfiguration config)
         {
+            var connectionString = config.GetConnectionString("DefaultConnection");
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    "Connection string 'DefaultConnection' is not configured. Set ConnectionStrings:DefaultConnection or ConnectionStrings__DefaultConnection.");
+            }
+
             options.UseSqlServer(
-                config.GetConnectionString("DefaultConnection"),
+                connectionString,
                 sqlOptions => sqlOptions.MigrationsAssembly(
                     typeof(ApplicationDbContext).Assembly.FullName));
         }
