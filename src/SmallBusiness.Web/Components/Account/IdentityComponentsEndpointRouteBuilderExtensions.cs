@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
@@ -42,14 +44,62 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             return TypedResults.Challenge(properties, [provider]);
         });
 
-        accountGroup.MapPost("/Logout", async (
-            ClaimsPrincipal user,
-            [FromServices] SignInManager<ApplicationUser> signInManager,
-            [FromForm] string returnUrl) =>
+        accountGroup.MapGet("/Logout", (
+            HttpContext context,
+            [FromServices] IAntiforgery antiforgery,
+            [FromQuery] string? returnUrl) =>
         {
+            var normalizedReturnUrl = NormalizeLocalReturnUrl(returnUrl);
+            var encodedReturnUrl = HtmlEncoder.Default.Encode(normalizedReturnUrl);
+            var tokens = antiforgery.GetAndStoreTokens(context);
+            var fieldName = HtmlEncoder.Default.Encode(tokens.FormFieldName);
+            var requestToken = HtmlEncoder.Default.Encode(tokens.RequestToken ?? string.Empty);
+
+            var html = $$"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="utf-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                    <title>Log Out — SBMS</title>
+                    <link rel="stylesheet" href="/lib/bootstrap/dist/css/bootstrap.min.css" />
+                    <link rel="stylesheet" href="/app.css" />
+                </head>
+                <body>
+                    <main class="container py-5">
+                        <div class="row justify-content-center">
+                            <div class="col-12 col-md-8 col-lg-5">
+                                <div class="card shadow-sm">
+                                    <div class="card-body">
+                                        <h1 class="h3">Log out</h1>
+                                        <p class="text-muted">End your current SBMS session.</p>
+                                        <form method="post" action="/Account/Logout?returnUrl={{encodedReturnUrl}}" data-enhance="false">
+                                            <input name="{{fieldName}}" type="hidden" value="{{requestToken}}" />
+                                            <button type="submit" class="btn btn-danger">Log out</button>
+                                            <a href="/" class="btn btn-outline-secondary ms-2">Cancel</a>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </body>
+                </html>
+                """;
+
+            return Results.Content(html, "text/html");
+        }).RequireAuthorization();
+
+        accountGroup.MapPost("/Logout", async (
+            HttpContext context,
+            [FromServices] IAntiforgery antiforgery,
+            [FromServices] SignInManager<ApplicationUser> signInManager,
+            [FromQuery] string? returnUrl) =>
+        {
+            await antiforgery.ValidateRequestAsync(context);
             await signInManager.SignOutAsync();
-            return TypedResults.LocalRedirect($"~/{returnUrl}");
-        });
+            return TypedResults.LocalRedirect($"~/{NormalizeLocalReturnUrl(returnUrl)}");
+        }).RequireAuthorization();
 
         accountGroup.MapGet("/SelectBusiness", async (
             HttpContext context,

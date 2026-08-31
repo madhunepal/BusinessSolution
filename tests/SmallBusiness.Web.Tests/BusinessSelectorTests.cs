@@ -204,7 +204,7 @@ public class BusinessSelectorTests
         Assert.Single(cut.FindAll("a[href=\"/dashboard\"]"));
         Assert.Contains("Switch Business", cut.Markup);
         Assert.Contains("Account/Profile", cut.Markup);
-        Assert.Single(cut.FindAll("form[action=\"/Account/Logout\"] button"));
+        Assert.Single(cut.FindAll("a[href=\"/Account/Logout?returnUrl=%2F\"]"));
         Assert.DoesNotContain("Get Started", cut.Markup);
         Assert.DoesNotContain(">Log in<", cut.Markup);
     }
@@ -228,7 +228,7 @@ public class BusinessSelectorTests
         Assert.Contains("Small Business Management System", cut.Markup);
         Assert.Single(cut.FindAll("a[href=\"/dashboard\"]"));
         Assert.Contains("Account/Profile", cut.Markup);
-        Assert.Single(cut.FindAll("form[action=\"/Account/Logout\"] button"));
+        Assert.Single(cut.FindAll("a[href=\"/Account/Logout?returnUrl=%2F\"]"));
         Assert.DoesNotContain("Get Started", cut.Markup);
         Assert.DoesNotContain(">Log in<", cut.Markup);
     }

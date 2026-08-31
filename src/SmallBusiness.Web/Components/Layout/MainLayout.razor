@@ -39,11 +39,7 @@
                                     <li><a class="dropdown-item" href="/Account/Manage">Account/Profile</a></li>
                                 </ul>
                             </div>
-                            <form method="post" action="/Account/Logout" class="d-inline">
-                                <AntiforgeryToken />
-                                <input type="hidden" name="ReturnUrl" value="/" />
-                                <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>
-                            </form>
+                            <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-secondary btn-sm" data-enhance-nav="false">Log out</a>
                         </div>
                     </div>
 

@@ -51,20 +51,12 @@
                                         <li><a class="dropdown-item" href="/onboarding/business">Switch Business</a></li>
                                     </ul>
                                 </div>
-                                <form method="post" action="/Account/Logout" class="d-inline">
-                                    <AntiforgeryToken />
-                                    <input type="hidden" name="ReturnUrl" value="/" />
-                                    <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
-                                </form>
+                                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-light btn-sm" data-enhance-nav="false">Log out</a>
                             }
                             else
                             {
                                 <a href="/onboarding/business" class="btn btn-outline-light btn-sm">Set up business</a>
-                                <form method="post" action="/Account/Logout" class="d-inline">
-                                    <AntiforgeryToken />
-                                    <input type="hidden" name="ReturnUrl" value="/" />
-                                    <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
-                                </form>
+                                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-light btn-sm" data-enhance-nav="false">Log out</a>
                             }
                         </Authorized>
                         <NotAuthorized>

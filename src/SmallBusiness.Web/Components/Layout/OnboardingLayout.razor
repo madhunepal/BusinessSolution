@@ -8,11 +8,7 @@
             </a>
             <div class="d-flex align-items-center gap-2">
                 <a href="/" class="btn btn-outline-secondary btn-sm">Back to Home</a>
-                <form method="post" action="/Account/Logout" class="d-inline">
-                    <AntiforgeryToken />
-                    <input type="hidden" name="ReturnUrl" value="/" />
-                    <button type="submit" class="btn btn-outline-danger btn-sm">Sign out</button>
-                </form>
+                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-danger btn-sm" data-enhance-nav="false">Sign out</a>
             </div>
         </div>
     </header>
