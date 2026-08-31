@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using SmallBusiness.Application.Interfaces;
 using SmallBusiness.Domain.Common;
 using SmallBusiness.Domain.Entities;
@@ -20,6 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>, IApplica
     {
     }
 
+    [ActivatorUtilitiesConstructor]
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
         ITenantContext tenantContext)

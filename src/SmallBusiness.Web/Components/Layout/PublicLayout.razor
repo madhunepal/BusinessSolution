@@ -1,8 +1,8 @@
 @inherits LayoutComponentBase
-@using Microsoft.EntityFrameworkCore
 @using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.Services
 @inject ITenantContext TenantContext
-@inject IApplicationDbContext DbContext
+@inject BusinessService BusinessService
 
 <div class="public-layout">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
@@ -49,16 +49,13 @@
                                         <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
                                         <li><a class="dropdown-item" href="/Account/Manage">Account/Profile</a></li>
                                         <li><a class="dropdown-item" href="/onboarding/business">Switch Business</a></li>
-                                        <li><hr class="dropdown-divider" /></li>
-                                        <li>
-                                            <form method="post" action="/Account/Logout">
-                                                <AntiforgeryToken />
-                                                <input type="hidden" name="ReturnUrl" value="/" />
-                                                <button type="submit" class="dropdown-item">Log out</button>
-                                            </form>
-                                        </li>
                                     </ul>
                                 </div>
+                                <form method="post" action="/Account/Logout" class="d-inline">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="ReturnUrl" value="/" />
+                                    <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+                                </form>
                             }
                             else
                             {
@@ -96,13 +93,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (TenantContext.CurrentBusinessId is Guid businessId)
+        if (TenantContext.CurrentBusinessId is not null)
         {
-            _businessName = await DbContext.Businesses
-                .IgnoreQueryFilters()
-                .Where(b => b.Id == businessId)
-                .Select(b => b.Name)
-                .FirstOrDefaultAsync();
+            var result = await BusinessService.GetCurrentBusinessAsync();
+            if (result.Succeeded && result.Value is not null)
+            {
+                _businessName = result.Value.Name;
+            }
         }
     }
 }

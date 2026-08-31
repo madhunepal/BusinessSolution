@@ -105,7 +105,7 @@ public sealed class SqlServerIntegrationTests
             setup.InventoryLocations.Add(location);
             await setup.SaveChangesAsync();
 
-            var setupService = new InventoryService(setup, tenant.Object);
+            var setupService = new InventoryService(new SqlServerApplicationDbContextFactory(_fixture, tenant.Object), tenant.Object);
             await setupService.ReceiveStockAsync(new StockReceiptDto { InventoryProfileId = profile.Id, InventoryLocationId = location.Id, Quantity = 5 });
             profileId = profile.Id;
             locationId = location.Id;
@@ -119,8 +119,8 @@ public sealed class SqlServerIntegrationTests
         Assert.Equal(5, bucketB.QuantityOnHand);
         Assert.Equal(bucketA.RowVersion, bucketB.RowVersion);
 
-        var serviceA = new InventoryService(contextA, tenant.Object);
-        var serviceB = new InventoryService(contextB, tenant.Object);
+        var serviceA = new InventoryService(new SqlServerApplicationDbContextFactory(_fixture, tenant.Object), tenant.Object);
+        var serviceB = new InventoryService(new SqlServerApplicationDbContextFactory(_fixture, tenant.Object), tenant.Object);
         var request = new StockUsageDto { InventoryProfileId = profileId, InventoryLocationId = locationId, Quantity = 4 };
 
         await serviceA.RecordUsageAsync(request);

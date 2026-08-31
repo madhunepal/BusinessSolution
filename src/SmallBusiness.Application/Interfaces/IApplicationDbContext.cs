@@ -8,7 +8,7 @@ namespace SmallBusiness.Application.Interfaces;
 /// Allows the Application layer to depend on an abstraction rather
 /// than the concrete EF Core DbContext in Infrastructure.
 /// </summary>
-public interface IApplicationDbContext
+public interface IApplicationDbContext : IAsyncDisposable
 {
     DbSet<Business> Businesses { get; }
     DbSet<BusinessUser> BusinessUsers { get; }

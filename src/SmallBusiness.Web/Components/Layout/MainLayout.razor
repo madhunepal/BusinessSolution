@@ -1,6 +1,9 @@
 @inherits LayoutComponentBase
 @using SmallBusiness.Application.Interfaces
+@using SmallBusiness.Application.Services
+@using System.Security.Claims
 @inject ITenantContext TenantContext
+@inject BusinessService BusinessService
 
 <AuthorizeView>
     <Authorized>
@@ -12,17 +15,35 @@
                 </div>
 
                 <main>
-                    <div class="top-row px-4 d-flex justify-content-between align-items-center">
-                        <div>
-                            <span class="badge bg-primary me-2">Business: @TenantContext.CurrentBusinessId</span>
+                    <div class="top-row px-4 d-flex justify-content-between align-items-center gap-3">
+                        <div class="shell-page-title">
+                            <span class="fw-semibold">Workspace</span>
                         </div>
-                        <div>
-                        <span class="text-muted me-3">@context.User.Identity?.Name</span>
-                        <form method="post" action="/Account/Logout" class="d-inline">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="/" />
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">Logout</button>
-                        </form>
+                        <div class="d-flex align-items-center gap-2 shell-actions">
+                            <div class="dropdown">
+                                <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    @BusinessDisplayName
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><span class="dropdown-item-text fw-semibold">@BusinessDisplayName</span></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li><a class="dropdown-item" href="/onboarding/business">Switch Business</a></li>
+                                </ul>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    @UserDisplayName(context.User)
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
+                                    <li><a class="dropdown-item" href="/Account/Manage">Account/Profile</a></li>
+                                </ul>
+                            </div>
+                            <form method="post" action="/Account/Logout" class="d-inline">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="/" />
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">Log out</button>
+                            </form>
                         </div>
                     </div>
 
@@ -45,3 +66,40 @@
         </main>
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    private string? _businessName;
+
+    private string BusinessDisplayName => string.IsNullOrWhiteSpace(_businessName)
+        ? "Current Business"
+        : _businessName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (TenantContext.CurrentBusinessId is not null)
+        {
+            var result = await BusinessService.GetCurrentBusinessAsync();
+            if (result.Succeeded && result.Value is not null)
+            {
+                _businessName = result.Value.Name;
+            }
+        }
+    }
+
+    private static string UserDisplayName(ClaimsPrincipal user)
+    {
+        var name = user.FindFirstValue("name");
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name;
+        }
+
+        var email = user.FindFirstValue(ClaimTypes.Email);
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            return email;
+        }
+
+        return user.Identity?.Name ?? "Account";
+    }
+}

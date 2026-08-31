@@ -21,16 +21,25 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        static void ConfigureSqlServer(DbContextOptionsBuilder options, IConfiguration config)
+        {
+            options.UseSqlServer(
+                config.GetConnectionString("DefaultConnection"),
+                sqlOptions => sqlOptions.MigrationsAssembly(
+                    typeof(ApplicationDbContext).Assembly.FullName));
+        }
+
         // EF Core + SQL Server
         services.AddDbContext<ApplicationDbContext>(options =>
-            options.UseSqlServer(
-                configuration.GetConnectionString("DefaultConnection"),
-                sqlOptions => sqlOptions.MigrationsAssembly(
-                    typeof(ApplicationDbContext).Assembly.FullName)));
+            ConfigureSqlServer(options, configuration));
+        services.AddDbContextFactory<ApplicationDbContext>(
+            options => ConfigureSqlServer(options, configuration),
+            ServiceLifetime.Scoped);
 
         // Expose IApplicationDbContext for the Application layer
         services.AddScoped<IApplicationDbContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IApplicationDbContextFactory, ApplicationDbContextFactory>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 

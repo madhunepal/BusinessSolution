@@ -17,6 +17,7 @@ namespace SmallBusiness.Application.Tests;
 public class InventoryServiceTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
+    private readonly TestApplicationDbContextFactory _contextFactory;
     private readonly Mock<ITenantContext> _mockTenantContext;
     private readonly InventoryService _service;
     private readonly Guid _businessId = Guid.NewGuid();
@@ -33,8 +34,9 @@ public class InventoryServiceTests : IDisposable
         _mockTenantContext.Setup(x => x.UserId).Returns(_userId);
 
         _context = new ApplicationDbContext(options, _mockTenantContext.Object);
+        _contextFactory = new TestApplicationDbContextFactory(options, _mockTenantContext.Object);
         
-        _service = new InventoryService(_context, _mockTenantContext.Object);
+        _service = new InventoryService(_contextFactory, _mockTenantContext.Object);
     }
 
     [Fact]
@@ -212,6 +214,77 @@ public class InventoryServiceTests : IDisposable
 
         var req = new StockReceiptDto { InventoryProfileId = profile.Id, InventoryLocationId = Guid.NewGuid(), Quantity = 10 };
         await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.ReceiveStockAsync(req));
+    }
+
+    [Fact]
+    public async Task CreateLocation_UsesCurrentTenantAndTrimsName()
+    {
+        var location = await _service.CreateLocationAsync(new CreateInventoryLocationDto
+        {
+            Name = "  Main  ",
+            Description = "  Primary stock room  "
+        });
+
+        var storedLocation = await _context.InventoryLocations.IgnoreQueryFilters().SingleAsync(l => l.Id == location.Id);
+        Assert.Equal(_businessId, storedLocation.BusinessId);
+        Assert.Equal("Main", storedLocation.Name);
+        Assert.Equal("Primary stock room", storedLocation.Description);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task CreateLocation_EmptyName_IsRejected(string name)
+    {
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.CreateLocationAsync(new CreateInventoryLocationDto { Name = name }));
+
+        Assert.Equal(0, await _context.InventoryLocations.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateLocation_DuplicateNameInCurrentTenant_IsRejected()
+    {
+        await _service.CreateLocationAsync(new CreateInventoryLocationDto { Name = "Main" });
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.CreateLocationAsync(new CreateInventoryLocationDto { Name = " main " }));
+
+        Assert.Equal(1, await _context.InventoryLocations.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateLocation_DuplicateNameInOtherTenant_DoesNotBlockCurrentTenant()
+    {
+        _context.InventoryLocations.Add(new InventoryLocation
+        {
+            Id = Guid.NewGuid(),
+            BusinessId = Guid.NewGuid(),
+            Name = "Main",
+            IsActive = true
+        });
+        await _context.SaveChangesAsync();
+
+        var location = await _service.CreateLocationAsync(new CreateInventoryLocationDto { Name = "Main" });
+
+        var storedLocation = await _context.InventoryLocations.IgnoreQueryFilters().SingleAsync(l => l.Id == location.Id);
+        Assert.Equal(_businessId, storedLocation.BusinessId);
+    }
+
+    [Fact]
+    public void CreateLocation_RequestDoesNotAcceptBrowserBusinessId()
+    {
+        Assert.Null(typeof(CreateInventoryLocationDto).GetProperty("BusinessId"));
+    }
+
+    [Fact]
+    public async Task GetLocations_ReturnsCreatedLocationForInventoryMovementLookups()
+    {
+        var location = await _service.CreateLocationAsync(new CreateInventoryLocationDto { Name = "Truck" });
+
+        var locations = await _service.GetLocationsAsync();
+
+        Assert.Contains(locations, l => l.Id == location.Id && l.Name == "Truck");
     }
 
     [Fact]

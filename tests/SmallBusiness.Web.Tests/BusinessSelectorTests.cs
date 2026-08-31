@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Runtime.CompilerServices;
 using Bunit;
 using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Authentication;
@@ -24,6 +25,8 @@ namespace SmallBusiness.Web.Tests;
 
 public class BusinessSelectorTests
 {
+    private static readonly ConditionalWeakTable<ApplicationDbContext, DbContextOptions<ApplicationDbContext>> ContextOptions = new();
+
     [Fact]
     public async Task CreateButton_ClickForFirstBusiness_CreatesOwnerMembershipAndEstablishesActiveBusiness()
     {
@@ -161,12 +164,17 @@ public class BusinessSelectorTests
     [Fact]
     public void MainLayout_ForTenantUser_RendersApplicationNavigation()
     {
-        using var context = CreateLayoutContext(isAuthenticated: true, currentBusinessId: Guid.NewGuid());
+        var businessId = Guid.NewGuid();
+        using var context = CreateLayoutContext(isAuthenticated: true, currentBusinessId: businessId, out var dbContext);
+        dbContext.Businesses.Add(new Business { Id = businessId, Name = "Acme Services" });
+        dbContext.SaveChanges();
 
         var cut = context.Render<MainLayout>(parameters => parameters.Add(p => p.Body, _ => { }));
 
         Assert.Contains("Dashboard", cut.Markup);
-        Assert.DoesNotContain("/onboarding/business", cut.Markup);
+        Assert.Contains("Acme Services", cut.Markup);
+        Assert.DoesNotContain(businessId.ToString(), cut.Markup);
+        Assert.Contains("Switch Business", cut.Markup);
     }
 
     [Fact]
@@ -193,22 +201,63 @@ public class BusinessSelectorTests
         var cut = context.Render<PublicLayout>(parameters => parameters.Add(p => p.Body, _ => { }));
 
         cut.WaitForAssertion(() => Assert.Contains("Acme Services", cut.Markup));
-        Assert.Contains("Dashboard", cut.Markup);
+        Assert.Single(cut.FindAll("a[href=\"/dashboard\"]"));
         Assert.Contains("Switch Business", cut.Markup);
+        Assert.Contains("Account/Profile", cut.Markup);
+        Assert.Single(cut.FindAll("form[action=\"/Account/Logout\"] button"));
+        Assert.DoesNotContain("Get Started", cut.Markup);
+        Assert.DoesNotContain(">Log in<", cut.Markup);
+    }
+
+    [Fact]
+    public async Task PublicHome_ForAuthenticatedTenantUser_RendersAuthenticatedHeaderBehavior()
+    {
+        await using var dbContext = CreateDbContext();
+        var business = new Business { Id = Guid.NewGuid(), Name = "Acme Services" };
+        dbContext.Businesses.Add(business);
+        await dbContext.SaveChangesAsync();
+        using var context = CreatePublicLayoutContext(isAuthenticated: true, dbContext, business.Id);
+
+        var cut = context.Render<PublicLayout>(parameters => parameters.Add(p => p.Body, builder =>
+        {
+            builder.OpenComponent<SmallBusiness.Web.Components.Pages.Public.Index>(0);
+            builder.CloseComponent();
+        }));
+
+        cut.WaitForAssertion(() => Assert.Contains("Acme Services", cut.Markup));
+        Assert.Contains("Small Business Management System", cut.Markup);
+        Assert.Single(cut.FindAll("a[href=\"/dashboard\"]"));
+        Assert.Contains("Account/Profile", cut.Markup);
+        Assert.Single(cut.FindAll("form[action=\"/Account/Logout\"] button"));
         Assert.DoesNotContain("Get Started", cut.Markup);
         Assert.DoesNotContain(">Log in<", cut.Markup);
     }
 
     private static ApplicationDbContext CreateDbContext()
     {
+        return CreateDbContext(out _);
+    }
+
+    private static ApplicationDbContext CreateDbContext(out DbContextOptions<ApplicationDbContext> options)
+    {
         var tenantContext = new Mock<ITenantContext>();
         tenantContext.Setup(t => t.CurrentBusinessId).Returns((Guid?)null);
 
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+        return CreateDbContext(tenantContext.Object, out options);
+    }
+
+    private static ApplicationDbContext CreateDbContext(
+        ITenantContext tenantContext,
+        out DbContextOptions<ApplicationDbContext> options)
+    {
+
+        options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        return new ApplicationDbContext(options, tenantContext.Object);
+        var context = new ApplicationDbContext(options, tenantContext);
+        ContextOptions.Add(context, options);
+        return context;
     }
 
     private static BunitContext CreateComponentContext(
@@ -233,7 +282,15 @@ public class BusinessSelectorTests
         IReadOnlyCollection<Claim>? existingClaims = null)
     {
         var context = new BunitContext();
-        dbContext ??= CreateDbContext();
+        DbContextOptions<ApplicationDbContext> dbOptions;
+        if (dbContext is null)
+        {
+            dbContext = CreateDbContext(out dbOptions);
+        }
+        else
+        {
+            dbOptions = GetOptions(dbContext);
+        }
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         var user = string.IsNullOrWhiteSpace(userId)
             ? null
@@ -260,9 +317,10 @@ public class BusinessSelectorTests
         tenantContext.Setup(t => t.UserId).Returns(userId);
 
         context.Services.AddSingleton<IApplicationDbContext>(dbContext);
+        context.Services.AddSingleton<IApplicationDbContextFactory>(new TestApplicationDbContextFactory(dbOptions, tenantContext.Object));
         context.Services.AddSingleton<ITenantContext>(tenantContext.Object);
         context.Services.AddSingleton<AuthenticationStateProvider>(new TestAuthenticationStateProvider(principal));
-        context.Services.AddSingleton(new BusinessService(dbContext, tenantContext.Object));
+        context.Services.AddSingleton(new BusinessService(new TestApplicationDbContextFactory(dbOptions, tenantContext.Object), tenantContext.Object));
         context.Services.AddSingleton(userManager.Object);
         context.Services.AddSingleton(signInManager.Object);
         context.Services.AddLogging();
@@ -271,9 +329,18 @@ public class BusinessSelectorTests
 
     private static BunitContext CreateLayoutContext(bool isAuthenticated, Guid? currentBusinessId)
     {
+        return CreateLayoutContext(isAuthenticated, currentBusinessId, out _);
+    }
+
+    private static BunitContext CreateLayoutContext(
+        bool isAuthenticated,
+        Guid? currentBusinessId,
+        out ApplicationDbContext dbContext)
+    {
         var context = new BunitContext();
         var tenantContext = new Mock<ITenantContext>();
         tenantContext.Setup(t => t.CurrentBusinessId).Returns(currentBusinessId);
+        dbContext = CreateDbContext(tenantContext.Object, out var options);
 
         var identity = isAuthenticated
             ? new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "user-id"), new Claim(ClaimTypes.Name, "user@example.test")], "TestAuth")
@@ -292,6 +359,10 @@ public class BusinessSelectorTests
             authorization.SetNotAuthorized();
         }
 
+        context.Services.AddSingleton<IApplicationDbContext>(dbContext);
+        context.Services.AddSingleton<IApplicationDbContextFactory>(new TestApplicationDbContextFactory(options, tenantContext.Object));
+        context.Services.AddSingleton(new BusinessService(new TestApplicationDbContextFactory(options, tenantContext.Object), tenantContext.Object));
+
         return context;
     }
 
@@ -300,8 +371,31 @@ public class BusinessSelectorTests
         ApplicationDbContext dbContext,
         Guid? currentBusinessId)
     {
-        var context = CreateLayoutContext(isAuthenticated, currentBusinessId);
+        var context = new BunitContext();
+        var tenantContext = new Mock<ITenantContext>();
+        tenantContext.Setup(t => t.CurrentBusinessId).Returns(currentBusinessId);
+        var options = GetOptions(dbContext);
+
+        var identity = isAuthenticated
+            ? new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "user-id"), new Claim(ClaimTypes.Name, "user@example.test")], "TestAuth")
+            : new ClaimsIdentity();
+        var principal = new ClaimsPrincipal(identity);
+
+        context.Services.AddSingleton<ITenantContext>(tenantContext.Object);
+        var authorization = context.AddAuthorization();
+        if (isAuthenticated)
+        {
+            authorization.SetAuthorized("user@example.test");
+            authorization.SetClaims(principal.Claims.ToArray());
+        }
+        else
+        {
+            authorization.SetNotAuthorized();
+        }
+
         context.Services.AddSingleton<IApplicationDbContext>(dbContext);
+        context.Services.AddSingleton<IApplicationDbContextFactory>(new TestApplicationDbContextFactory(options, tenantContext.Object));
+        context.Services.AddSingleton(new BusinessService(new TestApplicationDbContextFactory(options, tenantContext.Object), tenantContext.Object));
         return context;
     }
 
@@ -335,6 +429,16 @@ public class BusinessSelectorTests
 
     private static bool IsBusinessIdClaim(Claim claim) =>
         claim.Type == "BusinessId" && Guid.TryParse(claim.Value, out _);
+
+    private static DbContextOptions<ApplicationDbContext> GetOptions(ApplicationDbContext dbContext)
+    {
+        if (!ContextOptions.TryGetValue(dbContext, out var options))
+        {
+            throw new InvalidOperationException("Test DbContext options were not captured.");
+        }
+
+        return options;
+    }
 
     private sealed class TestAuthenticationStateProvider : AuthenticationStateProvider
     {

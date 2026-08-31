@@ -5,12 +5,13 @@
 @using SmallBusiness.Infrastructure.Identity
 @inject IInventoryService InventoryService
 @attribute [Authorize(Policy = Permissions.InventoryManage)]
+@rendermode InteractiveServer
 
 <PageTitle>Inventory Locations</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Inventory Locations</h1>
-    <button class="btn btn-primary" @onclick="ShowAddModal">Add Location</button>
+    <button type="button" class="btn btn-primary" @onclick="ShowAddModal" data-testid="inventory-add-location">Add Location</button>
 </div>
 
 @if (_locations == null)
@@ -66,7 +67,7 @@ else
 
 @if (_showModal)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" data-testid="inventory-location-modal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -74,17 +75,23 @@ else
                     <button type="button" class="btn-close" @onclick="HideModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                    {
+                        <div class="alert alert-danger" data-testid="inventory-location-error">@_errorMessage</div>
+                    }
+
                     <EditForm Model="_model" OnValidSubmit="HandleSubmit">
                         <DataAnnotationsValidator />
                         <ValidationSummary class="text-danger" />
                         
                         <div class="mb-3">
                             <label class="form-label">Name</label>
-                            <InputText @bind-Value="_model.Name" class="form-control" />
+                            <InputText @bind-Value="_model.Name" class="form-control" data-testid="inventory-location-name" />
+                            <ValidationMessage For="@(() => _model.Name)" class="text-danger" />
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Description</label>
-                            <InputText @bind-Value="_model.Description" class="form-control" />
+                            <InputText @bind-Value="_model.Description" class="form-control" data-testid="inventory-location-description" />
                         </div>
                         <div class="mb-3 form-check">
                             <InputCheckbox @bind-Value="_model.IsDefault" class="form-check-input" id="isDefaultCheck" />
@@ -92,8 +99,8 @@ else
                         </div>
                         
                         <div class="modal-footer px-0 pb-0">
-                            <button type="button" class="btn btn-secondary" @onclick="HideModal">Cancel</button>
-                            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                            <button type="button" class="btn btn-secondary" @onclick="HideModal" data-testid="inventory-location-cancel">Cancel</button>
+                            <button type="submit" class="btn btn-primary" disabled="@_isSubmitting" data-testid="inventory-location-save">
                                 @if (_isSubmitting)
                                 {
                                     <span class="spinner-border spinner-border-sm me-1"></span>
@@ -112,6 +119,7 @@ else
     private List<InventoryLocationDto>? _locations;
     private bool _showModal;
     private bool _isSubmitting;
+    private string? _errorMessage;
     private CreateInventoryLocationDto _model = new();
 
     protected override async Task OnInitializedAsync()
@@ -127,22 +135,39 @@ else
     private void ShowAddModal()
     {
         _model = new CreateInventoryLocationDto();
+        _errorMessage = null;
         _showModal = true;
     }
 
     private void HideModal()
     {
         _showModal = false;
+        _errorMessage = null;
     }
 
     private async Task HandleSubmit()
     {
+        if (_isSubmitting)
+        {
+            return;
+        }
+
         _isSubmitting = true;
+        _errorMessage = null;
         try
         {
             await InventoryService.CreateLocationAsync(_model);
             _showModal = false;
+            _model = new CreateInventoryLocationDto();
             await LoadDataAsync();
+        }
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = "Unable to create location: " + ex.Message;
         }
         finally
         {

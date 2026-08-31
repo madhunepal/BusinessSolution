@@ -13,12 +13,17 @@ namespace SmallBusiness.Application.Tests;
 
 public class AppointmentServiceTests
 {
-    private ApplicationDbContext CreateInMemoryContext(ITenantContext tenantContext)
+    private static DbContextOptions<ApplicationDbContext> CreateInMemoryOptions()
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+        return new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
-            
+    }
+
+    private ApplicationDbContext CreateInMemoryContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ITenantContext tenantContext)
+    {
         return new ApplicationDbContext(options, tenantContext);
     }
 
@@ -31,7 +36,8 @@ public class AppointmentServiceTests
         mockContext.Setup(c => c.CurrentBusinessId).Returns(businessId);
         mockContext.Setup(c => c.UserId).Returns("test-user");
 
-        await using var dbContext = CreateInMemoryContext(mockContext.Object);
+        var options = CreateInMemoryOptions();
+        await using var dbContext = CreateInMemoryContext(options, mockContext.Object);
         
         var job = new Job
         {
@@ -53,7 +59,7 @@ public class AppointmentServiceTests
         
         await dbContext.SaveChangesAsync();
 
-        var service = new AppointmentService(dbContext, mockContext.Object);
+        var service = new AppointmentService(new TestApplicationDbContextFactory(options, mockContext.Object), mockContext.Object);
         
         var request = new CreateAppointmentRequest
         {
@@ -82,7 +88,8 @@ public class AppointmentServiceTests
         var mockContext = new Mock<ITenantContext>();
         mockContext.Setup(c => c.CurrentBusinessId).Returns(businessId);
 
-        await using var dbContext = CreateInMemoryContext(mockContext.Object);
+        var options = CreateInMemoryOptions();
+        await using var dbContext = CreateInMemoryContext(options, mockContext.Object);
         
         var job = new Job
         {
@@ -122,7 +129,7 @@ public class AppointmentServiceTests
         
         await dbContext.SaveChangesAsync();
 
-        var service = new AppointmentService(dbContext, mockContext.Object);
+        var service = new AppointmentService(new TestApplicationDbContextFactory(options, mockContext.Object), mockContext.Object);
         
         var request = new CreateAppointmentRequest
         {
@@ -149,7 +156,8 @@ public class AppointmentServiceTests
         var mockContext = new Mock<ITenantContext>();
         mockContext.Setup(c => c.CurrentBusinessId).Returns(businessId);
 
-        await using var dbContext = CreateInMemoryContext(mockContext.Object);
+        var options = CreateInMemoryOptions();
+        await using var dbContext = CreateInMemoryContext(options, mockContext.Object);
         
         var job = new Job
         {
@@ -173,12 +181,13 @@ public class AppointmentServiceTests
         
         await dbContext.SaveChangesAsync();
 
-        var service = new AppointmentService(dbContext, mockContext.Object);
+        var service = new AppointmentService(new TestApplicationDbContextFactory(options, mockContext.Object), mockContext.Object);
 
         // Act
         await service.ChangeAppointmentStatusAsync(appt.Id, AppointmentStatus.InProgress);
 
         // Assert
+        dbContext.ChangeTracker.Clear();
         var updatedJob = await dbContext.Jobs.FindAsync(job.Id);
         Assert.Equal(JobStatus.InProgress, updatedJob!.Status);
         
@@ -195,7 +204,8 @@ public class AppointmentServiceTests
         var mockContext = new Mock<ITenantContext>();
         mockContext.Setup(c => c.CurrentBusinessId).Returns(businessId);
 
-        await using var dbContext = CreateInMemoryContext(mockContext.Object);
+        var options = CreateInMemoryOptions();
+        await using var dbContext = CreateInMemoryContext(options, mockContext.Object);
         
         var job = new Job
         {
@@ -219,12 +229,13 @@ public class AppointmentServiceTests
         
         await dbContext.SaveChangesAsync();
 
-        var service = new AppointmentService(dbContext, mockContext.Object);
+        var service = new AppointmentService(new TestApplicationDbContextFactory(options, mockContext.Object), mockContext.Object);
 
         // Act
         await service.ChangeAppointmentStatusAsync(appt.Id, AppointmentStatus.Completed);
 
         // Assert
+        dbContext.ChangeTracker.Clear();
         var updatedJob = await dbContext.Jobs.FindAsync(job.Id);
         Assert.Equal(JobStatus.InProgress, updatedJob!.Status); // Job is STILL InProgress
         

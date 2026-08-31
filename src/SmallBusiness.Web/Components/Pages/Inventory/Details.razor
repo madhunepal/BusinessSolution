@@ -6,6 +6,7 @@
 @using System.ComponentModel.DataAnnotations
 @inject IInventoryService InventoryService
 @attribute [Authorize(Policy = Permissions.InventoryView)]
+@rendermode InteractiveServer
 
 <PageTitle>Inventory Details</PageTitle>
 
@@ -23,14 +24,14 @@ else
         
         <div>
             <AuthorizeView Policy="@Permissions.InventoryReceive">
-                <button class="btn btn-success me-1" @onclick="ShowReceiveModal">Receive</button>
+                <button class="btn btn-success me-1" data-testid="inventory-receive-action" @onclick="ShowReceiveModal">Receive</button>
             </AuthorizeView>
             <AuthorizeView Policy="@Permissions.InventoryAdjust">
-                <button class="btn btn-warning me-1" @onclick="ShowAdjustModal">Adjust</button>
-                <button class="btn btn-danger me-1" @onclick="ShowReduceModal">Reduce</button>
+                <button class="btn btn-warning me-1" data-testid="inventory-adjust-action" @onclick="ShowAdjustModal">Adjust</button>
+                <button class="btn btn-danger me-1" data-testid="inventory-reduce-action" @onclick="ShowReduceModal">Reduce</button>
             </AuthorizeView>
             <AuthorizeView Policy="@Permissions.InventoryTransfer">
-                <button class="btn btn-info" @onclick="ShowTransferModal">Transfer</button>
+                <button class="btn btn-info" data-testid="inventory-transfer-action" @onclick="ShowTransferModal">Transfer</button>
             </AuthorizeView>
         </div>
 

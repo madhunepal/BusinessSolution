@@ -10,12 +10,12 @@ namespace SmallBusiness.Application.Services;
 /// </summary>
 public class BusinessService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IApplicationDbContextFactory _contextFactory;
     private readonly ITenantContext _tenantContext;
 
-    public BusinessService(IApplicationDbContext context, ITenantContext tenantContext)
+    public BusinessService(IApplicationDbContextFactory contextFactory, ITenantContext tenantContext)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _tenantContext = tenantContext;
     }
 
@@ -74,9 +74,10 @@ public class BusinessService
             CreatedAt = DateTime.UtcNow
         };
 
-        _context.Businesses.Add(business);
-        _context.BusinessUsers.Add(businessUser);
-        await _context.SaveChangesAsync(cancellationToken);
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        context.Businesses.Add(business);
+        context.BusinessUsers.Add(businessUser);
+        await context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(business.Id);
     }
@@ -91,7 +92,8 @@ public class BusinessService
             return Result.Failure<Business>("No active business selected.");
         }
 
-        var business = await _context.Businesses.FindAsync(
+        await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
+        var business = await context.Businesses.FindAsync(
             [_tenantContext.CurrentBusinessId.Value], cancellationToken);
 
         if (business is null)

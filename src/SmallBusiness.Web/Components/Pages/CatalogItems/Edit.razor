@@ -40,9 +40,9 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Type <span class="text-danger">*</span></label>
-                                <InputSelect @bind-Value="_request.Type" class="form-select">
-                                    <option value="1">Product</option>
-                                    <option value="2">Service</option>
+                                <InputSelect @bind-Value="_request.Type" class="form-select" data-testid="catalog-item-type-select">
+                                    <option value="@CatalogItemType.Product">Product</option>
+                                    <option value="@CatalogItemType.Service">Service</option>
                                 </InputSelect>
                                 <ValidationMessage For="@(() => _request.Type)" class="text-danger" />
                             </div>

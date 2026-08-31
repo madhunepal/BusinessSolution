@@ -1,7 +1,10 @@
 <AuthorizeView>
     <Authorized>
-        <a href="@PrimaryUrl" class="@PrimaryCss">@PrimaryText</a>
-        <a href="/dashboard" class="@SecondaryCss">Dashboard</a>
+        @if (ShowAuthorizedActions)
+        {
+            <a href="@PrimaryUrl" class="@PrimaryCss">@PrimaryText</a>
+            <a href="/dashboard" class="@SecondaryCss">Dashboard</a>
+        }
     </Authorized>
     <NotAuthorized>
         <a href="/Account/Register" class="@PrimaryCss">Get Started</a>
@@ -21,4 +24,7 @@
 
     [Parameter]
     public string SecondaryCss { get; set; } = "btn btn-outline-primary btn-lg";
+
+    [Parameter]
+    public bool ShowAuthorizedActions { get; set; } = true;
 }

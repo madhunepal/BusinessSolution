@@ -1,33 +1,35 @@
+@inject NavigationManager NavigationManager
+
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">SBMS</a>
+        <a class="navbar-brand" href="/">SBMS</a>
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" aria-label="Toggle navigation" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="flex-column">
 
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="dashboard">
+            <NavLink class="nav-link" href="/dashboard" Match="NavLinkMatch.All">
                 <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Dashboard
             </NavLink>
         </div>
 
-        @* CRM *@
+        @* Sales *@
         <div class="nav-section-header px-3 mt-3">
-            <small class="text-muted text-uppercase fw-bold">CRM</small>
+            <small class="nav-section-label text-uppercase fw-bold">Sales</small>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="customers">
                 <span class="bi bi-people-fill" aria-hidden="true"></span> Customers
             </NavLink>
         </div>
-
-        @* Sales *@
-        <div class="nav-section-header px-3 mt-3">
-            <small class="text-muted text-uppercase fw-bold">Sales</small>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="catalog">
+                <span class="bi bi-list-ul" aria-hidden="true"></span> Catalog
+            </NavLink>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="quotes">
@@ -40,16 +42,6 @@
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="jobs">
-                <span class="bi bi-tools" aria-hidden="true"></span> Jobs
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="schedule">
-                <span class="bi bi-calendar-event" aria-hidden="true"></span> Schedule
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
             <NavLink class="nav-link" href="invoices">
                 <span class="bi bi-receipt" aria-hidden="true"></span> Invoices
             </NavLink>
@@ -57,7 +49,7 @@
 
         @* Operations *@
         <div class="nav-section-header px-3 mt-3">
-            <small class="text-muted text-uppercase fw-bold">Operations</small>
+            <small class="nav-section-label text-uppercase fw-bold">Operations</small>
         </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="jobs">
@@ -65,40 +57,40 @@
             </NavLink>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="schedule">
+            <a class="@ScheduleNavClass" href="schedule">
                 <span class="bi bi-calendar3" aria-hidden="true"></span> Schedule
-            </NavLink>
-        </div>
-
-        @* Inventory *@
-        <div class="nav-section-header px-3 mt-3">
-            <small class="text-muted text-uppercase fw-bold">Inventory</small>
+            </a>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="inventory">
+            <a class="@InventoryNavClass" href="inventory">
                 <span class="bi bi-box-seam-fill" aria-hidden="true"></span> Inventory
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="catalog">
-                <span class="bi bi-list-ul" aria-hidden="true"></span> Catalog
-            </NavLink>
+            </a>
         </div>
 
-        @* Administration *@
+        @* Business *@
         <div class="nav-section-header px-3 mt-3">
-            <small class="text-muted text-uppercase fw-bold">Admin</small>
+            <small class="nav-section-label text-uppercase fw-bold">Business</small>
         </div>
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="admin/users">
-                <span class="bi bi-shield-lock-fill" aria-hidden="true"></span> Users
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="admin/settings">
-                <span class="bi bi-gear-fill" aria-hidden="true"></span> Settings
+            <NavLink class="nav-link" href="onboarding/business">
+                <span class="bi bi-arrow-left-right" aria-hidden="true"></span> Switch Business
             </NavLink>
         </div>
 
     </nav>
 </div>
+
+@code {
+    private string ScheduleNavClass => NavClass("schedule", "appointments");
+    private string InventoryNavClass => NavClass("inventory");
+
+    private string NavClass(params string[] routePrefixes)
+    {
+        var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Trim('/');
+        var isActive = routePrefixes.Any(prefix =>
+            string.Equals(path, prefix, StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase));
+
+        return isActive ? "nav-link active" : "nav-link";
+    }
+}

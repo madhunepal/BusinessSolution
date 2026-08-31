@@ -11,9 +11,11 @@ namespace SmallBusiness.Application.Tests;
 
 public class BusinessServiceTests
 {
-    private static ApplicationDbContext CreateInMemoryContext(ITenantContext? currentUserService = null)
+    private static ApplicationDbContext CreateInMemoryContext(
+        out DbContextOptions<ApplicationDbContext> options,
+        ITenantContext? currentUserService = null)
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+        options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
@@ -32,11 +34,11 @@ public class BusinessServiceTests
     public async Task CreateBusinessAsync_WithValidData_Succeeds()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.UserId).Returns("user-123");
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         // Act
         var result = await service.CreateBusinessAsync("Test HVAC LLC", "555-0100", "info@testhvac.com");
@@ -57,12 +59,12 @@ public class BusinessServiceTests
     [Fact]
     public async Task CreateBusinessAsync_WithNoCurrentBusiness_CreatesActiveOwnerMembership()
     {
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.UserId).Returns("new-user");
         currentUser.Setup(x => x.CurrentBusinessId).Returns((Guid?)null);
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         var result = await service.CreateBusinessAsync("First Business");
 
@@ -83,7 +85,7 @@ public class BusinessServiceTests
         var setupTenant = new Mock<ITenantContext>();
         setupTenant.Setup(x => x.CurrentBusinessId).Returns((Guid?)null);
         await using var context = new ApplicationDbContext(options, setupTenant.Object);
-        var service = new BusinessService(context, setupTenant.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, setupTenant.Object), setupTenant.Object);
 
         var result = await service.CreateBusinessForUserAsync("new-user", "First Business");
         Assert.True(result.Succeeded);
@@ -108,11 +110,11 @@ public class BusinessServiceTests
     public async Task CreateBusinessAsync_WithEmptyName_Fails()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.UserId).Returns("user-123");
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         // Act
         var result = await service.CreateBusinessAsync("");
@@ -126,11 +128,11 @@ public class BusinessServiceTests
     public async Task CreateBusinessAsync_WithWhitespaceName_Fails()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.UserId).Returns("user-123");
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         // Act
         var result = await service.CreateBusinessAsync("   ");
@@ -144,11 +146,11 @@ public class BusinessServiceTests
     public async Task CreateBusinessAsync_WithNoUser_Fails()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.UserId).Returns((string?)null);
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         // Act
         var result = await service.CreateBusinessAsync("Test Co");
@@ -162,11 +164,11 @@ public class BusinessServiceTests
     public async Task GetCurrentBusinessAsync_WithNoBusiness_Fails()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.CurrentBusinessId).Returns((Guid?)null);
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         // Act
         var result = await service.GetCurrentBusinessAsync();
@@ -180,11 +182,11 @@ public class BusinessServiceTests
     public async Task CreateBusinessAsync_TrimsBusiness_Name()
     {
         // Arrange
-        await using var context = CreateInMemoryContext();
+        await using var context = CreateInMemoryContext(out var options);
         var currentUser = new Mock<ITenantContext>();
         currentUser.Setup(x => x.UserId).Returns("user-123");
 
-        var service = new BusinessService(context, currentUser.Object);
+        var service = new BusinessService(new TestApplicationDbContextFactory(options, currentUser.Object), currentUser.Object);
 
         // Act
         var result = await service.CreateBusinessAsync("  Test Co  ");

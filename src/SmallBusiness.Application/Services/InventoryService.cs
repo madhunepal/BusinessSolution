@@ -9,16 +9,16 @@ namespace SmallBusiness.Application.Services;
 
 public class InventoryService : IInventoryService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IApplicationDbContextFactory _contextFactory;
     private readonly ITenantContext _tenantContext;
     private readonly IPermissionService? _permissionService;
 
     public InventoryService(
-        IApplicationDbContext context,
+        IApplicationDbContextFactory contextFactory,
         ITenantContext tenantContext,
         IPermissionService? permissionService = null)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _tenantContext = tenantContext;
         _permissionService = permissionService;
     }
@@ -29,12 +29,13 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
-        var profiles = await _context.InventoryProfiles
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var profiles = await context.InventoryProfiles
             .Include(p => p.CatalogItem)
             .Where(p => p.BusinessId == businessId)
             .ToListAsync();
             
-        var stockLevels = await _context.InventoryStockLevels
+        var stockLevels = await context.InventoryStockLevels
             .Where(s => s.BusinessId == businessId)
             .GroupBy(s => s.InventoryProfileId)
             .Select(g => new { ProfileId = g.Key, TotalQty = g.Sum(s => s.QuantityOnHand) })
@@ -47,12 +48,13 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
-        var profile = await _context.InventoryProfiles
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var profile = await context.InventoryProfiles
             .Include(p => p.CatalogItem)
             .FirstOrDefaultAsync(p => p.Id == id && p.BusinessId == businessId)
             ?? throw new KeyNotFoundException("Inventory profile not found.");
 
-        var totalQty = await _context.InventoryStockLevels
+        var totalQty = await context.InventoryStockLevels
             .Where(s => s.BusinessId == businessId && s.InventoryProfileId == id)
             .SumAsync(s => s.QuantityOnHand);
 
@@ -63,8 +65,9 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.Manage");
         var businessId = GetBusinessId();
+        await using var context = await _contextFactory.CreateDbContextAsync();
         
-        var catalogItem = await _context.CatalogItems
+        var catalogItem = await context.CatalogItems
             .FirstOrDefaultAsync(c => c.Id == request.CatalogItemId && c.BusinessId == businessId)
             ?? throw new KeyNotFoundException("Catalog item not found.");
             
@@ -74,7 +77,7 @@ public class InventoryService : IInventoryService
         if (request.TrackExpiration && !request.TrackLots)
             throw new ValidationException("TrackExpiration requires TrackLots to be true.");
 
-        var existing = await _context.InventoryProfiles
+        var existing = await context.InventoryProfiles
             .AnyAsync(p => p.CatalogItemId == request.CatalogItemId && p.BusinessId == businessId);
             
         if (existing)
@@ -93,9 +96,9 @@ public class InventoryService : IInventoryService
             IsActive = true
         };
 
-        _context.InventoryProfiles.Add(profile);
+        context.InventoryProfiles.Add(profile);
         
-        _context.Activities.Add(new Activity
+        context.Activities.Add(new Activity
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
@@ -106,7 +109,7 @@ public class InventoryService : IInventoryService
             CreatedBy = _tenantContext.UserId ?? "System"
         });
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         
         // Load navigation property for mapping
         profile.CatalogItem = catalogItem;
@@ -118,7 +121,8 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.Manage");
         var businessId = GetBusinessId();
-        var profile = await _context.InventoryProfiles
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var profile = await context.InventoryProfiles
             .Include(p => p.CatalogItem)
             .FirstOrDefaultAsync(p => p.Id == request.Id && p.BusinessId == businessId)
             ?? throw new KeyNotFoundException("Inventory profile not found.");
@@ -133,7 +137,7 @@ public class InventoryService : IInventoryService
         profile.AllowNegativeStock = request.AllowNegativeStock;
         profile.IsActive = request.IsActive;
         
-        _context.Activities.Add(new Activity
+        context.Activities.Add(new Activity
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
@@ -144,9 +148,9 @@ public class InventoryService : IInventoryService
             CreatedBy = _tenantContext.UserId ?? "System"
         });
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
 
-        var totalQty = await _context.InventoryStockLevels
+        var totalQty = await context.InventoryStockLevels
             .Where(s => s.BusinessId == businessId && s.InventoryProfileId == profile.Id)
             .SumAsync(s => s.QuantityOnHand);
 
@@ -157,7 +161,8 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
-        var locations = await _context.InventoryLocations
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var locations = await context.InventoryLocations
             .Where(l => l.BusinessId == businessId)
             .ToListAsync();
             
@@ -168,10 +173,25 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.Manage");
         var businessId = GetBusinessId();
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var locationName = request.Name?.Trim();
+        if (string.IsNullOrWhiteSpace(locationName))
+        {
+            throw new ValidationException("Location name is required.");
+        }
+
+        var duplicateNameExists = await context.InventoryLocations
+            .AnyAsync(l => l.BusinessId == businessId && l.Name.ToLower() == locationName.ToLower());
+
+        if (duplicateNameExists)
+        {
+            throw new ValidationException("An inventory location with this name already exists.");
+        }
         
         if (request.IsDefault)
         {
-            var defaults = await _context.InventoryLocations
+            var defaults = await context.InventoryLocations
                 .Where(l => l.BusinessId == businessId && l.IsDefault)
                 .ToListAsync();
             foreach (var d in defaults)
@@ -182,14 +202,14 @@ public class InventoryService : IInventoryService
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
-            Name = request.Name,
-            Description = request.Description,
+            Name = locationName,
+            Description = request.Description?.Trim(),
             IsDefault = request.IsDefault,
             IsActive = true
         };
 
-        _context.InventoryLocations.Add(location);
-        await _context.SaveChangesAsync();
+        context.InventoryLocations.Add(location);
+        await context.SaveChangesAsync();
         
         return MapLocationToDto(location);
     }
@@ -280,24 +300,25 @@ public class InventoryService : IInventoryService
             throw new ValidationException("Source and destination locations cannot be the same.");
 
         var businessId = GetBusinessId();
+        await using var context = await _contextFactory.CreateDbContextAsync();
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++)
         {
             try
             {
-                var profile = await _context.InventoryProfiles
+                var profile = await context.InventoryProfiles
                     .FirstOrDefaultAsync(p => p.Id == request.InventoryProfileId && p.BusinessId == businessId)
                     ?? throw new KeyNotFoundException("Inventory profile not found.");
 
-                await ValidateLocationAsync(request.SourceLocationId, businessId);
-                await ValidateLocationAsync(request.DestinationLocationId, businessId);
+                await ValidateLocationAsync(context, request.SourceLocationId, businessId);
+                await ValidateLocationAsync(context, request.DestinationLocationId, businessId);
 
                 if (profile.TrackLots && !request.InventoryLotId.HasValue)
                     throw new ValidationException("Lot selection is required for this inventory profile.");
                     
                 if (request.InventoryLotId.HasValue)
                 {
-                    var lot = await _context.InventoryLots
+                    var lot = await context.InventoryLots
                         .FirstOrDefaultAsync(l => l.Id == request.InventoryLotId.Value && l.BusinessId == businessId)
                         ?? throw new ValidationException("Invalid lot.");
                     if (lot.InventoryProfileId != profile.Id)
@@ -305,7 +326,7 @@ public class InventoryService : IInventoryService
                 }
 
                 // 1. Process Source bucket
-                var sourceBucket = await GetOrCreateBucketAsync(businessId, profile.Id, request.SourceLocationId, request.InventoryLotId);
+                var sourceBucket = await GetOrCreateBucketAsync(context, businessId, profile.Id, request.SourceLocationId, request.InventoryLotId);
                 
                 var newSourceQty = sourceBucket.QuantityOnHand - request.Quantity;
                 if (!profile.AllowNegativeStock && newSourceQty < 0)
@@ -325,10 +346,10 @@ public class InventoryService : IInventoryService
                     OccurredAt = DateTimeOffset.UtcNow,
                     CreatedBy = _tenantContext.UserId ?? "System"
                 };
-                _context.InventoryMovements.Add(outMovement);
+                context.InventoryMovements.Add(outMovement);
 
                 // 2. Process Destination bucket
-                var destBucket = await GetOrCreateBucketAsync(businessId, profile.Id, request.DestinationLocationId, request.InventoryLotId);
+                var destBucket = await GetOrCreateBucketAsync(context, businessId, profile.Id, request.DestinationLocationId, request.InventoryLotId);
                 destBucket.QuantityOnHand += request.Quantity;
 
                 var inMovement = new InventoryMovement
@@ -344,9 +365,9 @@ public class InventoryService : IInventoryService
                     OccurredAt = DateTimeOffset.UtcNow,
                     CreatedBy = _tenantContext.UserId ?? "System"
                 };
-                _context.InventoryMovements.Add(inMovement);
+                context.InventoryMovements.Add(inMovement);
                 
-                _context.Activities.Add(new Activity
+                context.Activities.Add(new Activity
                 {
                     Id = Guid.NewGuid(),
                     BusinessId = businessId,
@@ -357,11 +378,11 @@ public class InventoryService : IInventoryService
                     CreatedBy = _tenantContext.UserId ?? "System"
                 });
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 
                 // Load nav properties for DTOs
-                outMovement = await LoadMovementNavigations(outMovement.Id);
-                inMovement = await LoadMovementNavigations(inMovement.Id);
+                outMovement = await LoadMovementNavigations(context, outMovement.Id);
+                inMovement = await LoadMovementNavigations(context, inMovement.Id);
                 
                 return new List<InventoryMovementDto> { MapMovementToDto(outMovement), MapMovementToDto(inMovement) };
             }
@@ -369,7 +390,7 @@ public class InventoryService : IInventoryService
             {
                 if (i == maxRetries - 1) throw new InvalidOperationException("Failed to transfer stock due to concurrent updates.");
                 
-                ClearTrackedState();
+                ClearTrackedState(context);
                 await Task.Delay(Random.Shared.Next(50, 150));
             }
         }
@@ -389,17 +410,18 @@ public class InventoryService : IInventoryService
         string? reason)
     {
         var businessId = GetBusinessId();
+        await using var context = await _contextFactory.CreateDbContextAsync();
         
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++)
         {
             try
             {
-                var profile = await _context.InventoryProfiles
+                var profile = await context.InventoryProfiles
                     .FirstOrDefaultAsync(p => p.Id == profileId && p.BusinessId == businessId)
                     ?? throw new KeyNotFoundException("Inventory profile not found.");
 
-                await ValidateLocationAsync(locationId, businessId);
+                await ValidateLocationAsync(context, locationId, businessId);
 
                 Guid? finalLotId = existingLotId;
 
@@ -410,7 +432,7 @@ public class InventoryService : IInventoryService
                         
                     if (existingLotId.HasValue)
                     {
-                        var existing = await _context.InventoryLots
+                        var existing = await context.InventoryLots
                             .FirstOrDefaultAsync(l => l.Id == existingLotId.Value && l.BusinessId == businessId)
                             ?? throw new ValidationException("Invalid lot.");
                         if (existing.InventoryProfileId != profile.Id)
@@ -442,7 +464,7 @@ public class InventoryService : IInventoryService
                             UnitCost = newLotDto.UnitCost,
                             Notes = newLotDto.Notes
                         };
-                        _context.InventoryLots.Add(lot);
+                        context.InventoryLots.Add(lot);
                         finalLotId = lot.Id;
                     }
                 }
@@ -452,7 +474,7 @@ public class InventoryService : IInventoryService
                         throw new ValidationException("This profile does not track lots.");
                 }
 
-                var bucket = await GetOrCreateBucketAsync(businessId, profileId, locationId, finalLotId);
+                var bucket = await GetOrCreateBucketAsync(context, businessId, profileId, locationId, finalLotId);
                 
                 var newQty = bucket.QuantityOnHand + quantityChange;
                 
@@ -477,7 +499,7 @@ public class InventoryService : IInventoryService
                     CreatedBy = _tenantContext.UserId ?? "System"
                 };
 
-                _context.InventoryMovements.Add(movement);
+                context.InventoryMovements.Add(movement);
 
                 var activityType = type switch
                 {
@@ -488,7 +510,7 @@ public class InventoryService : IInventoryService
                     _ => ActivityType.Updated
                 };
 
-                _context.Activities.Add(new Activity
+                context.Activities.Add(new Activity
                 {
                     Id = Guid.NewGuid(),
                     BusinessId = businessId,
@@ -499,16 +521,16 @@ public class InventoryService : IInventoryService
                     CreatedBy = _tenantContext.UserId ?? "System"
                 });
 
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
                 
-                movement = await LoadMovementNavigations(movement.Id);
+                movement = await LoadMovementNavigations(context, movement.Id);
                 return MapMovementToDto(movement);
             }
             catch (DbUpdateConcurrencyException)
             {
                 if (i == maxRetries - 1) throw new InvalidOperationException("Failed to process stock movement due to concurrent updates.");
                 
-                ClearTrackedState();
+                ClearTrackedState(context);
                 await Task.Delay(Random.Shared.Next(50, 150));
             }
         }
@@ -516,9 +538,9 @@ public class InventoryService : IInventoryService
         throw new InvalidOperationException("Failed to process operation.");
     }
 
-    private async Task<InventoryStockLevel> GetOrCreateBucketAsync(Guid businessId, Guid profileId, Guid locationId, Guid? lotId)
+    private async Task<InventoryStockLevel> GetOrCreateBucketAsync(IApplicationDbContext context, Guid businessId, Guid profileId, Guid locationId, Guid? lotId)
     {
-        var bucket = await _context.InventoryStockLevels
+        var bucket = await context.InventoryStockLevels
             .FirstOrDefaultAsync(s => s.BusinessId == businessId && 
                                       s.InventoryProfileId == profileId && 
                                       s.InventoryLocationId == locationId && 
@@ -536,7 +558,7 @@ public class InventoryService : IInventoryService
                 QuantityOnHand = 0,
                 RowVersion = new byte[8]
             };
-            _context.InventoryStockLevels.Add(bucket);
+            context.InventoryStockLevels.Add(bucket);
             // Calling SaveChanges to insert the row isn't strictly necessary here if we save at the end, 
             // but for concurrent inserts of the same bucket, we might hit unique constraint violations.
             // EF will handle unique constraint violation on SaveChangesAsync(). We let the caller handle it.
@@ -544,9 +566,9 @@ public class InventoryService : IInventoryService
         return bucket;
     }
 
-    private async Task<InventoryMovement> LoadMovementNavigations(Guid movementId)
+    private async Task<InventoryMovement> LoadMovementNavigations(IApplicationDbContext context, Guid movementId)
     {
-        return await _context.InventoryMovements
+        return await context.InventoryMovements
             .Include(m => m.InventoryLocation)
             .Include(m => m.InventoryLot)
             .FirstAsync(m => m.Id == movementId);
@@ -556,7 +578,8 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
-        var movements = await _context.InventoryMovements
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var movements = await context.InventoryMovements
             .Include(m => m.InventoryLocation)
             .Include(m => m.InventoryLot)
             .Where(m => m.BusinessId == businessId && m.InventoryProfileId == profileId)
@@ -571,7 +594,8 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
-        var levels = await _context.InventoryStockLevels
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var levels = await context.InventoryStockLevels
             .Include(s => s.InventoryLocation)
             .Include(s => s.InventoryLot)
             .Where(s => s.BusinessId == businessId && s.InventoryProfileId == profileId)
@@ -592,13 +616,14 @@ public class InventoryService : IInventoryService
     {
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
+        await using var context = await _contextFactory.CreateDbContextAsync();
         
-        var profiles = await _context.InventoryProfiles
+        var profiles = await context.InventoryProfiles
             .Include(p => p.CatalogItem)
             .Where(p => p.BusinessId == businessId && p.IsActive)
             .ToListAsync();
             
-        var stockLevels = await _context.InventoryStockLevels
+        var stockLevels = await context.InventoryStockLevels
             .Where(s => s.BusinessId == businessId)
             .GroupBy(s => s.InventoryProfileId)
             .Select(g => new { ProfileId = g.Key, TotalQty = g.Sum(s => s.QuantityOnHand) })
@@ -615,8 +640,9 @@ public class InventoryService : IInventoryService
         await EnsurePermissionAsync("Inventory.View");
         var businessId = GetBusinessId();
         var thresholdDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysToExpiration));
+        await using var context = await _contextFactory.CreateDbContextAsync();
         
-        var lots = await _context.InventoryLots
+        var lots = await context.InventoryLots
             .Where(l => l.BusinessId == businessId && 
                         l.ExpirationDate != null && 
                         l.ExpirationDate <= thresholdDate)
@@ -680,9 +706,9 @@ public class InventoryService : IInventoryService
         CreatedBy = m.CreatedBy
     };
 
-    private async Task ValidateLocationAsync(Guid locationId, Guid businessId)
+    private async Task ValidateLocationAsync(IApplicationDbContext context, Guid locationId, Guid businessId)
     {
-        var exists = await _context.InventoryLocations
+        var exists = await context.InventoryLocations
             .AnyAsync(l => l.Id == locationId && l.BusinessId == businessId && l.IsActive);
 
         if (!exists)
@@ -694,20 +720,20 @@ public class InventoryService : IInventoryService
     private Task EnsurePermissionAsync(string permission) =>
         _permissionService?.EnsurePermissionAsync(permission) ?? Task.CompletedTask;
 
-    private void ClearTrackedState()
+    private static void ClearTrackedState(IApplicationDbContext context)
     {
-        if (_context is DbContext dbContext)
+        if (context is DbContext dbContext)
         {
             dbContext.ChangeTracker.Clear();
             return;
         }
 
-        _context.InventoryProfiles.Local.Clear();
-        _context.InventoryLocations.Local.Clear();
-        _context.InventoryLots.Local.Clear();
-        _context.InventoryMovements.Local.Clear();
-        _context.InventoryStockLevels.Local.Clear();
-        _context.Activities.Local.Clear();
-        _context.AuditLogs.Local.Clear();
+        context.InventoryProfiles.Local.Clear();
+        context.InventoryLocations.Local.Clear();
+        context.InventoryLots.Local.Clear();
+        context.InventoryMovements.Local.Clear();
+        context.InventoryStockLevels.Local.Clear();
+        context.Activities.Local.Clear();
+        context.AuditLogs.Local.Clear();
     }
 }

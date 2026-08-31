@@ -46,7 +46,7 @@ public class InventoryConcurrencyTests : IDisposable
         Guid profileId, locationId;
         using (var setupContext = new ApplicationDbContext(_options, _mockTenantContext.Object))
         {
-            var setupService = new InventoryService(setupContext, _mockTenantContext.Object);
+            var setupService = new InventoryService(new TestApplicationDbContextFactory(_options, _mockTenantContext.Object), _mockTenantContext.Object);
             
             var business = new Business { Id = _businessId, Name = "Test Business" };
             setupContext.Businesses.Add(business);
@@ -68,8 +68,8 @@ public class InventoryConcurrencyTests : IDisposable
         using var contextA = new ApplicationDbContext(_options, _mockTenantContext.Object);
         using var contextB = new ApplicationDbContext(_options, _mockTenantContext.Object);
         
-        var serviceA = new InventoryService(contextA, _mockTenantContext.Object);
-        var serviceB = new InventoryService(contextB, _mockTenantContext.Object);
+        var serviceA = new InventoryService(new TestApplicationDbContextFactory(_options, _mockTenantContext.Object), _mockTenantContext.Object);
+        var serviceB = new InventoryService(new TestApplicationDbContextFactory(_options, _mockTenantContext.Object), _mockTenantContext.Object);
 
         // Pre-load entities in both contexts so they both have Stale Data with original RowVersion
         var bucketA = await contextA.InventoryStockLevels.FirstAsync();

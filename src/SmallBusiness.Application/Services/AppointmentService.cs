@@ -9,16 +9,16 @@ namespace SmallBusiness.Application.Services;
 
 public class AppointmentService : IAppointmentService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IApplicationDbContextFactory _contextFactory;
     private readonly ITenantContext _tenantContext;
     private readonly IPermissionService? _permissionService;
 
     public AppointmentService(
-        IApplicationDbContext context,
+        IApplicationDbContextFactory contextFactory,
         ITenantContext tenantContext,
         IPermissionService? permissionService = null)
     {
-        _context = context;
+        _contextFactory = contextFactory;
         _tenantContext = tenantContext;
         _permissionService = permissionService;
     }
@@ -30,16 +30,17 @@ public class AppointmentService : IAppointmentService
             throw new ValidationException("End time must be after Start time.");
 
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException("Business context required.");
+        await using var context = await _contextFactory.CreateDbContextAsync();
 
         // Validate Job
-        var job = await _context.Jobs.FirstOrDefaultAsync(j => j.Id == request.JobId && j.BusinessId == businessId);
+        var job = await context.Jobs.FirstOrDefaultAsync(j => j.Id == request.JobId && j.BusinessId == businessId);
         if (job == null)
             throw new ValidationException("Job not found.");
             
         if (job.Status == JobStatus.Completed || job.Status == JobStatus.Cancelled)
             throw new ValidationException($"Cannot schedule an appointment for a Job that is {job.Status}.");
 
-        await CheckTechnicianOverlapsAsync(request.AssignedUserIds, request.Start, request.End, ignoreConflicts: ignoreConflicts);
+        await CheckTechnicianOverlapsAsync(context, request.AssignedUserIds, request.Start, request.End, ignoreConflicts: ignoreConflicts);
 
         var appointment = new Appointment
         {
@@ -55,7 +56,7 @@ public class AppointmentService : IAppointmentService
         foreach (var userId in request.AssignedUserIds)
         {
             // Validate BusinessUser
-            var isAuthorizedUser = await _context.BusinessUsers
+            var isAuthorizedUser = await context.BusinessUsers
                 .AnyAsync(u => u.BusinessId == businessId && u.UserId == userId && u.IsActive);
                 
             if (!isAuthorizedUser)
@@ -71,10 +72,10 @@ public class AppointmentService : IAppointmentService
             });
         }
 
-        _context.Appointments.Add(appointment);
+        context.Appointments.Add(appointment);
         
         // Log Activity
-        _context.Activities.Add(new Activity
+        context.Activities.Add(new Activity
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
@@ -85,7 +86,7 @@ public class AppointmentService : IAppointmentService
             
         });
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return appointment.Id;
     }
 
@@ -93,7 +94,8 @@ public class AppointmentService : IAppointmentService
     {
         await EnsurePermissionAsync("Schedule.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
-        var appointment = await _context.Appointments
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var appointment = await context.Appointments
             .Include(a => a.Job)
             .Include(a => a.Assignments)
             .FirstOrDefaultAsync(a => a.Id == id && a.BusinessId == businessId)
@@ -106,7 +108,8 @@ public class AppointmentService : IAppointmentService
     {
         await EnsurePermissionAsync("Schedule.View");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
-        var query = _context.Appointments
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var query = context.Appointments
             .Include(a => a.Job)
             .Include(a => a.Assignments)
             .Where(a => a.BusinessId == businessId)
@@ -144,7 +147,8 @@ public class AppointmentService : IAppointmentService
             throw new ValidationException("End time must be after Start time.");
 
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
-        var appointment = await _context.Appointments
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var appointment = await context.Appointments
             .Include(a => a.Assignments)
             .Include(a => a.Job)
             .FirstOrDefaultAsync(a => a.Id == id && a.BusinessId == businessId)
@@ -154,12 +158,12 @@ public class AppointmentService : IAppointmentService
             throw new ValidationException($"Cannot reschedule an appointment that is {appointment.Status}.");
             
         var assignedUsers = appointment.Assignments.Select(x => x.UserId).ToList();
-        await CheckTechnicianOverlapsAsync(assignedUsers, request.Start, request.End, appointment.Id, ignoreConflicts: ignoreConflicts);
+        await CheckTechnicianOverlapsAsync(context, assignedUsers, request.Start, request.End, appointment.Id, ignoreConflicts: ignoreConflicts);
 
         appointment.Start = request.Start;
         appointment.End = request.End;
 
-        _context.Activities.Add(new Activity
+        context.Activities.Add(new Activity
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
@@ -170,14 +174,15 @@ public class AppointmentService : IAppointmentService
             
         });
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 
     public async Task ChangeAppointmentStatusAsync(Guid id, AppointmentStatus status)
     {
         await EnsurePermissionAsync("Schedule.Manage");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
-        var appointment = await _context.Appointments
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var appointment = await context.Appointments
             .Include(a => a.Job)
             .FirstOrDefaultAsync(a => a.Id == id && a.BusinessId == businessId)
             ?? throw new KeyNotFoundException("Appointment not found.");
@@ -198,7 +203,7 @@ public class AppointmentService : IAppointmentService
         else if (status == AppointmentStatus.Completed && appointment.Status == AppointmentStatus.InProgress)
         {
             appointment.CompletedAt = DateTimeOffset.UtcNow;
-            _context.Activities.Add(new Activity
+            context.Activities.Add(new Activity
             {
                 Id = Guid.NewGuid(),
                 BusinessId = businessId,
@@ -212,7 +217,7 @@ public class AppointmentService : IAppointmentService
         else if (status == AppointmentStatus.Cancelled)
         {
             appointment.CancelledAt = DateTimeOffset.UtcNow;
-            _context.Activities.Add(new Activity
+            context.Activities.Add(new Activity
             {
                 Id = Guid.NewGuid(),
                 BusinessId = businessId,
@@ -236,7 +241,7 @@ public class AppointmentService : IAppointmentService
             {
                 appointment.Job.Status = JobStatus.InProgress;
                 appointment.Job.ActualStartDate = DateTime.UtcNow;
-                _context.Activities.Add(new Activity
+                context.Activities.Add(new Activity
                 {
                     Id = Guid.NewGuid(),
                     BusinessId = businessId,
@@ -252,7 +257,7 @@ public class AppointmentService : IAppointmentService
                 throw new ValidationException("Cannot start an appointment for a Draft Job. Job must be Ready first.");
             }
             
-            _context.Activities.Add(new Activity
+            context.Activities.Add(new Activity
             {
                 Id = Guid.NewGuid(),
                 BusinessId = businessId,
@@ -264,14 +269,15 @@ public class AppointmentService : IAppointmentService
             });
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 
     public async Task AssignTechnicianAsync(Guid appointmentId, string userId, bool ignoreConflicts = false)
     {
         await EnsurePermissionAsync("Schedule.Manage");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
-        var appointment = await _context.Appointments
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var appointment = await context.Appointments
             .Include(a => a.Assignments)
             .FirstOrDefaultAsync(a => a.Id == appointmentId && a.BusinessId == businessId)
             ?? throw new KeyNotFoundException("Appointment not found.");
@@ -282,13 +288,13 @@ public class AppointmentService : IAppointmentService
         if (appointment.Assignments.Any(a => a.UserId == userId))
             throw new ValidationException("User is already assigned to this appointment.");
 
-        var isAuthorizedUser = await _context.BusinessUsers
+        var isAuthorizedUser = await context.BusinessUsers
             .AnyAsync(u => u.BusinessId == businessId && u.UserId == userId && u.IsActive);
                 
         if (!isAuthorizedUser)
             throw new ValidationException($"User {userId} is not authorized for this business.");
 
-        await CheckTechnicianOverlapsAsync(new List<string> { userId }, appointment.Start, appointment.End, ignoreConflicts: ignoreConflicts);
+        await CheckTechnicianOverlapsAsync(context, new List<string> { userId }, appointment.Start, appointment.End, ignoreConflicts: ignoreConflicts);
 
         appointment.Assignments.Add(new AppointmentAssignment
         {
@@ -299,7 +305,7 @@ public class AppointmentService : IAppointmentService
             AssignedAt = DateTimeOffset.UtcNow
         });
 
-        _context.Activities.Add(new Activity
+        context.Activities.Add(new Activity
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
@@ -310,14 +316,15 @@ public class AppointmentService : IAppointmentService
             
         });
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
 
     public async Task RemoveTechnicianAsync(Guid appointmentId, string userId)
     {
         await EnsurePermissionAsync("Schedule.Manage");
         var businessId = _tenantContext.CurrentBusinessId ?? throw new UnauthorizedAccessException();
-        var appointment = await _context.Appointments
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var appointment = await context.Appointments
             .Include(a => a.Assignments)
             .FirstOrDefaultAsync(a => a.Id == appointmentId && a.BusinessId == businessId)
             ?? throw new KeyNotFoundException("Appointment not found.");
@@ -331,7 +338,7 @@ public class AppointmentService : IAppointmentService
 
         appointment.Assignments.Remove(assignment);
         
-        _context.Activities.Add(new Activity
+        context.Activities.Add(new Activity
         {
             Id = Guid.NewGuid(),
             BusinessId = businessId,
@@ -342,10 +349,10 @@ public class AppointmentService : IAppointmentService
             
         });
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
     }
     
-    private async Task CheckTechnicianOverlapsAsync(List<string> userIds, DateTimeOffset start, DateTimeOffset end, Guid? excludeAppointmentId = null, bool ignoreConflicts = false)
+    private async Task CheckTechnicianOverlapsAsync(IApplicationDbContext context, List<string> userIds, DateTimeOffset start, DateTimeOffset end, Guid? excludeAppointmentId = null, bool ignoreConflicts = false)
     {
         if (!userIds.Any() || ignoreConflicts) return;
         
@@ -353,7 +360,7 @@ public class AppointmentService : IAppointmentService
 
         // Detect overlapping appointments
         // existing.Start < proposed.End AND existing.End > proposed.Start
-        var overlappingQuery = _context.AppointmentAssignments
+        var overlappingQuery = context.AppointmentAssignments
             .Include(a => a.Appointment)
             .Where(a => a.BusinessId == businessId && 
                         userIds.Contains(a.UserId) &&
