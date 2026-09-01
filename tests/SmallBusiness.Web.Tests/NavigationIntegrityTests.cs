@@ -163,7 +163,53 @@ public class NavigationIntegrityTests
 
         Assert.Contains("class=\"navbar-toggler\"", source);
         Assert.Contains("aria-label=\"Toggle navigation\"", source);
+        Assert.Contains("aria-controls=\"authenticated-navigation\"", source);
+        Assert.Contains("aria-expanded=\"@MobileMenuExpanded\"", source);
+        Assert.Contains("@onclick=\"ToggleMobileMenu\"", source);
         Assert.Contains("nav-scrollable", source);
+        Assert.DoesNotContain("document.querySelector", source);
+        Assert.DoesNotContain("type=\"checkbox\"", source);
+    }
+
+    [Fact]
+    public void NavMenu_MobileMenuInitiallyCollapsed()
+    {
+        using var context = new BunitContext();
+
+        var cut = context.Render<NavMenu>();
+
+        Assert.Equal("false", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("show", cut.Find("#authenticated-navigation").ClassList);
+    }
+
+    [Fact]
+    public void NavMenu_HamburgerClickOpensAndClosesMobileMenu()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<NavMenu>();
+
+        cut.Find(".navbar-toggler").Click();
+
+        Assert.Equal("true", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.Contains("show", cut.Find("#authenticated-navigation").ClassList);
+
+        cut.Find(".navbar-toggler").Click();
+
+        Assert.Equal("false", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("show", cut.Find("#authenticated-navigation").ClassList);
+    }
+
+    [Fact]
+    public void NavMenu_SelectingNavigationItemClosesMobileMenu()
+    {
+        using var context = new BunitContext();
+        var cut = context.Render<NavMenu>();
+
+        cut.Find(".navbar-toggler").Click();
+        cut.Find("a[href=\"customers\"]").Click();
+
+        Assert.Equal("false", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("show", cut.Find("#authenticated-navigation").ClassList);
     }
 
     [Fact]
