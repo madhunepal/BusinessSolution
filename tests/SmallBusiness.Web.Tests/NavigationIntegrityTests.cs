@@ -172,6 +172,22 @@ public class NavigationIntegrityTests
     }
 
     [Fact]
+    public void App_ConfiguresRoutedApplicationForInteractiveServerRendering()
+    {
+        var app = ReadComponent("App.razor");
+        var routes = ReadComponent("Routes.razor");
+        var accountImports = ReadComponent("Account/Pages/_Imports.razor");
+        var program = File.ReadAllText(Path.Combine(RepositoryRoot, "src", "SmallBusiness.Web", "Program.cs"));
+
+        Assert.Contains("<HeadOutlet @rendermode=\"InteractiveServer\" />", app);
+        Assert.Contains("<Routes @rendermode=\"InteractiveServer\" />", app);
+        Assert.Contains("<CascadingAuthenticationState>", routes);
+        Assert.Contains("@attribute [ExcludeFromInteractiveRouting]", accountImports);
+        Assert.Contains(".AddInteractiveServerComponents()", program);
+        Assert.Contains(".AddInteractiveServerRenderMode()", program);
+    }
+
+    [Fact]
     public void NavMenu_MobileMenuInitiallyCollapsed()
     {
         using var context = new BunitContext();

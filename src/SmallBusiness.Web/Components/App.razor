@@ -12,13 +12,11 @@
     <link rel="stylesheet" href="@Assets["SmallBusiness.Web.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <CascadingAuthenticationState>
-        <Routes />
-    </CascadingAuthenticationState>
+    <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 
