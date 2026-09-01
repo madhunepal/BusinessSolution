@@ -10,58 +10,61 @@
             <a class="navbar-brand fw-bold" href="/">
                 <span class="text-primary">SBMS</span> — Small Business Management
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNavbar"
-                aria-controls="publicNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" @onclick="TogglePublicMenu"
+                aria-controls="publicNavbar" aria-expanded="@PublicMenuExpanded" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="publicNavbar">
+            <div class="@PublicNavbarClass" id="publicNavbar">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
+                        <a class="nav-link" href="/" @onclick="ClosePublicMenu">Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/crm">CRM</a>
+                        <a class="nav-link" href="/crm" @onclick="ClosePublicMenu">CRM</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/sales">Sales</a>
+                        <a class="nav-link" href="/sales" @onclick="ClosePublicMenu">Sales</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/operations">Operations</a>
+                        <a class="nav-link" href="/operations" @onclick="ClosePublicMenu">Operations</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/scheduling">Scheduling</a>
+                        <a class="nav-link" href="/scheduling" @onclick="ClosePublicMenu">Scheduling</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/finance">Finance</a>
+                        <a class="nav-link" href="/finance" @onclick="ClosePublicMenu">Finance</a>
                     </li>
                 </ul>
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
                     <AuthorizeView>
                         <Authorized>
                             @if (TenantContext.CurrentBusinessId is not null)
                             {
                                 <span class="badge text-bg-light">@(_businessName ?? "Business")</span>
                                 <div class="dropdown">
-                                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button"
+                                        @onclick="ToggleAccountMenu"
+                                        aria-expanded="@AccountMenuExpanded"
+                                        aria-controls="publicAccountMenu">
                                         @context.User.Identity?.Name
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item" href="/dashboard">Dashboard</a></li>
-                                        <li><a class="dropdown-item" href="/Account/Manage">Account/Profile</a></li>
-                                        <li><a class="dropdown-item" href="/onboarding/business">Switch Business</a></li>
+                                    <ul class="@AccountMenuClass" id="publicAccountMenu">
+                                        <li><a class="dropdown-item" href="/dashboard" @onclick="CloseMenus">Dashboard</a></li>
+                                        <li><a class="dropdown-item" href="/Account/Manage" @onclick="CloseMenus">Account/Profile</a></li>
+                                        <li><a class="dropdown-item" href="/onboarding/business" @onclick="CloseMenus">Switch Business</a></li>
                                     </ul>
                                 </div>
-                                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-light btn-sm" data-enhance-nav="false">Log out</a>
+                                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-light btn-sm" data-enhance-nav="false" @onclick="CloseMenus">Log out</a>
                             }
                             else
                             {
-                                <a href="/onboarding/business" class="btn btn-outline-light btn-sm">Set up business</a>
-                                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-light btn-sm" data-enhance-nav="false">Log out</a>
+                                <a href="/onboarding/business" class="btn btn-outline-light btn-sm" @onclick="ClosePublicMenu">Set up business</a>
+                                <a href="/Account/Logout?returnUrl=%2F" class="btn btn-outline-light btn-sm" data-enhance-nav="false" @onclick="ClosePublicMenu">Log out</a>
                             }
                         </Authorized>
                         <NotAuthorized>
-                            <a href="/Account/Login" class="btn btn-outline-light btn-sm">Log in</a>
-                            <a href="/Account/Register" class="btn btn-primary btn-sm">Get Started</a>
+                            <a href="/Account/Login" class="btn btn-outline-light btn-sm" @onclick="ClosePublicMenu">Log in</a>
+                            <a href="/Account/Register" class="btn btn-primary btn-sm" @onclick="ClosePublicMenu">Get Started</a>
                         </NotAuthorized>
                     </AuthorizeView>
                 </div>
@@ -82,6 +85,20 @@
 
 @code {
     private string? _businessName;
+    private bool isPublicMenuOpen;
+    private bool isAccountMenuOpen;
+
+    private string PublicNavbarClass => isPublicMenuOpen
+        ? "collapse navbar-collapse show"
+        : "collapse navbar-collapse";
+
+    private string PublicMenuExpanded => isPublicMenuOpen ? "true" : "false";
+
+    private string AccountMenuClass => isAccountMenuOpen
+        ? "dropdown-menu dropdown-menu-end show"
+        : "dropdown-menu dropdown-menu-end";
+
+    private string AccountMenuExpanded => isAccountMenuOpen ? "true" : "false";
 
     protected override async Task OnInitializedAsync()
     {
@@ -93,5 +110,31 @@
                 _businessName = result.Value.Name;
             }
         }
+    }
+
+    private void TogglePublicMenu()
+    {
+        isPublicMenuOpen = !isPublicMenuOpen;
+        if (!isPublicMenuOpen)
+        {
+            isAccountMenuOpen = false;
+        }
+    }
+
+    private void ClosePublicMenu()
+    {
+        isPublicMenuOpen = false;
+        isAccountMenuOpen = false;
+    }
+
+    private void ToggleAccountMenu()
+    {
+        isAccountMenuOpen = !isAccountMenuOpen;
+    }
+
+    private void CloseMenus()
+    {
+        isPublicMenuOpen = false;
+        isAccountMenuOpen = false;
     }
 }

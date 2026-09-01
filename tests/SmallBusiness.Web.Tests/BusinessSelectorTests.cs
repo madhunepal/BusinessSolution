@@ -26,6 +26,13 @@ namespace SmallBusiness.Web.Tests;
 public class BusinessSelectorTests
 {
     private static readonly ConditionalWeakTable<ApplicationDbContext, DbContextOptions<ApplicationDbContext>> ContextOptions = new();
+    private static readonly string RepositoryRoot = Path.GetFullPath(Path.Combine(
+        AppContext.BaseDirectory,
+        "..",
+        "..",
+        "..",
+        "..",
+        ".."));
 
     [Fact]
     public async Task CreateButton_ClickForFirstBusiness_CreatesOwnerMembershipAndEstablishesActiveBusiness()
@@ -190,6 +197,62 @@ public class BusinessSelectorTests
     }
 
     [Fact]
+    public async Task PublicLayout_PublicMobileMenuInitiallyClosed()
+    {
+        await using var dbContext = CreateDbContext();
+        using var context = CreatePublicLayoutContext(isAuthenticated: false, dbContext, null);
+
+        var cut = context.Render<PublicLayout>(parameters => parameters.Add(p => p.Body, _ => { }));
+
+        Assert.Equal("false", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.Equal("collapse navbar-collapse", cut.Find("#publicNavbar").GetAttribute("class"));
+    }
+
+    [Fact]
+    public async Task PublicLayout_HamburgerOpensAndClosesPublicMobileMenu()
+    {
+        await using var dbContext = CreateDbContext();
+        using var context = CreatePublicLayoutContext(isAuthenticated: false, dbContext, null);
+        var cut = context.Render<PublicLayout>(parameters => parameters.Add(p => p.Body, _ => { }));
+
+        cut.Find(".navbar-toggler").Click();
+
+        Assert.Equal("true", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.Equal("collapse navbar-collapse show", cut.Find("#publicNavbar").GetAttribute("class"));
+
+        cut.Find(".navbar-toggler").Click();
+
+        Assert.Equal("false", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.Equal("collapse navbar-collapse", cut.Find("#publicNavbar").GetAttribute("class"));
+    }
+
+    [Fact]
+    public async Task PublicLayout_ClickingPublicNavItemClosesMobileMenu()
+    {
+        await using var dbContext = CreateDbContext();
+        using var context = CreatePublicLayoutContext(isAuthenticated: false, dbContext, null);
+        var cut = context.Render<PublicLayout>(parameters => parameters.Add(p => p.Body, _ => { }));
+
+        cut.Find(".navbar-toggler").Click();
+        cut.Find("a[href=\"/crm\"]").Click();
+
+        Assert.Equal("false", cut.Find(".navbar-toggler").GetAttribute("aria-expanded"));
+        Assert.Equal("collapse navbar-collapse", cut.Find("#publicNavbar").GetAttribute("class"));
+    }
+
+    [Fact]
+    public void PublicLayout_DoesNotDependOnBootstrapCollapseJavaScript()
+    {
+        var source = ReadComponent("Layout/PublicLayout.razor");
+
+        Assert.DoesNotContain("data-bs-toggle=\"collapse\"", source);
+        Assert.DoesNotContain("data-bs-toggle=\"dropdown\"", source);
+        Assert.DoesNotContain("data-bs-target=\"#publicNavbar\"", source);
+        Assert.Contains("@onclick=\"TogglePublicMenu\"", source);
+        Assert.Contains("aria-controls=\"publicNavbar\"", source);
+    }
+
+    [Fact]
     public async Task PublicLayout_ForTenantUser_ShowsBusinessMenuWithoutAnonymousActions()
     {
         await using var dbContext = CreateDbContext();
@@ -207,6 +270,33 @@ public class BusinessSelectorTests
         Assert.Single(cut.FindAll("a[href=\"/Account/Logout?returnUrl=%2F\"]"));
         Assert.DoesNotContain("Get Started", cut.Markup);
         Assert.DoesNotContain(">Log in<", cut.Markup);
+    }
+
+    [Fact]
+    public async Task PublicLayout_AuthenticatedAccountDropdownOpensAndClosesWithBlazorState()
+    {
+        await using var dbContext = CreateDbContext();
+        var business = new Business { Id = Guid.NewGuid(), Name = "Acme Services" };
+        dbContext.Businesses.Add(business);
+        await dbContext.SaveChangesAsync();
+        using var context = CreatePublicLayoutContext(isAuthenticated: true, dbContext, business.Id);
+        var cut = context.Render<PublicLayout>(parameters => parameters.Add(p => p.Body, _ => { }));
+
+        cut.WaitForAssertion(() => Assert.Contains("Acme Services", cut.Markup));
+        var accountButton = cut.Find("button[aria-controls=\"publicAccountMenu\"]");
+
+        Assert.Equal("false", accountButton.GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("show", cut.Find("#publicAccountMenu").ClassList);
+
+        accountButton.Click();
+
+        Assert.Equal("true", cut.Find("button[aria-controls=\"publicAccountMenu\"]").GetAttribute("aria-expanded"));
+        Assert.Contains("show", cut.Find("#publicAccountMenu").ClassList);
+
+        cut.Find("a[href=\"/Account/Manage\"]").Click();
+
+        Assert.Equal("false", cut.Find("button[aria-controls=\"publicAccountMenu\"]").GetAttribute("aria-expanded"));
+        Assert.DoesNotContain("show", cut.Find("#publicAccountMenu").ClassList);
     }
 
     [Fact]
@@ -439,6 +529,9 @@ public class BusinessSelectorTests
 
         return options;
     }
+
+    private static string ReadComponent(string relativePath) =>
+        File.ReadAllText(Path.Combine(RepositoryRoot, "src", "SmallBusiness.Web", "Components", relativePath));
 
     private sealed class TestAuthenticationStateProvider : AuthenticationStateProvider
     {
