@@ -77,11 +77,21 @@ public class DeploymentReadinessTests
     }
 
     [Fact]
-    public void ProjectTargetsNet9ForAzureRuntimeSelection()
+    public void ProjectTargetsNet10ForAzureRuntimeSelection()
     {
         var props = ReadFile("Directory.Build.props");
 
-        Assert.Contains("<TargetFramework>net9.0</TargetFramework>", props);
+        Assert.Contains("<TargetFramework>net10.0</TargetFramework>", props);
+    }
+
+    [Fact]
+    public void Infrastructure_AllowsAzureSqlRetryWithoutChangingConnectionStringName()
+    {
+        var dependencyInjection = ReadFile("src", "SmallBusiness.Infrastructure", "DependencyInjection.cs");
+
+        Assert.Contains("GetConnectionString(\"DefaultConnection\")", dependencyInjection);
+        Assert.Contains("SqlServer:EnableRetryOnFailure", dependencyInjection);
+        Assert.Contains("sqlOptions.EnableRetryOnFailure()", dependencyInjection);
     }
 
     private static string ReadFile(params string[] pathParts) =>

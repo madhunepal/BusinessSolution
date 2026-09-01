@@ -32,8 +32,15 @@ public static class DependencyInjection
 
             options.UseSqlServer(
                 connectionString,
-                sqlOptions => sqlOptions.MigrationsAssembly(
-                    typeof(ApplicationDbContext).Assembly.FullName));
+                sqlOptions =>
+                {
+                    sqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+
+                    if (config.GetValue<bool>("SqlServer:EnableRetryOnFailure"))
+                    {
+                        sqlOptions.EnableRetryOnFailure();
+                    }
+                });
         }
 
         // EF Core + SQL Server

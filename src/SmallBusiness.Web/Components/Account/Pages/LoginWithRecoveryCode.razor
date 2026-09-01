@@ -36,8 +36,14 @@
     private string? message;
     private ApplicationUser user = default!;
 
+    private InputModel input = new();
+
     [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
+    private InputModel Input
+    {
+        get => input;
+        set => input = value ?? new();
+    }
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }

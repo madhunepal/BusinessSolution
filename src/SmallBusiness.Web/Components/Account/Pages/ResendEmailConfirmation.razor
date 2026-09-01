@@ -35,8 +35,14 @@
 @code {
     private string? message;
 
+    private InputModel input = new();
+
     [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
+    private InputModel Input
+    {
+        get => input;
+        set => input = value ?? new();
+    }
 
     private async Task OnValidSubmitAsync()
     {
