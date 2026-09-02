@@ -253,6 +253,21 @@ public class BusinessSelectorTests
     }
 
     [Fact]
+    public void PublicLayout_IdentityLinksUseFullPageNavigation()
+    {
+        var source = ReadComponent("Layout/PublicLayout.razor");
+        var mainLayout = ReadComponent("Layout/MainLayout.razor");
+        var publicCta = ReadComponent("Shared/PublicCta.razor");
+
+        Assert.Contains("href=\"/Account/Login\" class=\"btn btn-outline-light btn-sm\" data-enhance-nav=\"false\"", source);
+        Assert.Contains("href=\"/Account/Register\" class=\"btn btn-primary btn-sm\" data-enhance-nav=\"false\"", source);
+        Assert.Contains("href=\"/Account/Manage\" data-enhance-nav=\"false\"", source);
+        Assert.Contains("href=\"/Account/Manage\" data-enhance-nav=\"false\"", mainLayout);
+        Assert.Contains("href=\"/Account/Register\" class=\"@PrimaryCss\" data-enhance-nav=\"false\"", publicCta);
+        Assert.Contains("href=\"/Account/Login\" class=\"@SecondaryCss\" data-enhance-nav=\"false\"", publicCta);
+    }
+
+    [Fact]
     public async Task PublicLayout_ForTenantUser_ShowsBusinessMenuWithoutAnonymousActions()
     {
         await using var dbContext = CreateDbContext();

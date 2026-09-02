@@ -50,7 +50,7 @@
                                     </button>
                                     <ul class="@AccountMenuClass" id="publicAccountMenu">
                                         <li><a class="dropdown-item" href="/dashboard" @onclick="CloseMenus">Dashboard</a></li>
-                                        <li><a class="dropdown-item" href="/Account/Manage" @onclick="CloseMenus">Account/Profile</a></li>
+                                        <li><a class="dropdown-item" href="/Account/Manage" data-enhance-nav="false" @onclick="CloseMenus">Account/Profile</a></li>
                                         <li><a class="dropdown-item" href="/onboarding/business" @onclick="CloseMenus">Switch Business</a></li>
                                     </ul>
                                 </div>
@@ -63,8 +63,8 @@
                             }
                         </Authorized>
                         <NotAuthorized>
-                            <a href="/Account/Login" class="btn btn-outline-light btn-sm" @onclick="ClosePublicMenu">Log in</a>
-                            <a href="/Account/Register" class="btn btn-primary btn-sm" @onclick="ClosePublicMenu">Get Started</a>
+                            <a href="/Account/Login" class="btn btn-outline-light btn-sm" data-enhance-nav="false" @onclick="ClosePublicMenu">Log in</a>
+                            <a href="/Account/Register" class="btn btn-primary btn-sm" data-enhance-nav="false" @onclick="ClosePublicMenu">Get Started</a>
                         </NotAuthorized>
                     </AuthorizeView>
                 </div>

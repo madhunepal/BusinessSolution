@@ -172,19 +172,37 @@ public class NavigationIntegrityTests
     }
 
     [Fact]
-    public void App_ConfiguresRoutedApplicationForInteractiveServerRendering()
+    public void App_ConfiguresRoutedApplicationForMixedInteractiveAndStaticRendering()
     {
         var app = ReadComponent("App.razor");
         var routes = ReadComponent("Routes.razor");
         var accountImports = ReadComponent("Account/Pages/_Imports.razor");
         var program = File.ReadAllText(Path.Combine(RepositoryRoot, "src", "SmallBusiness.Web", "Program.cs"));
 
-        Assert.Contains("<HeadOutlet @rendermode=\"InteractiveServer\" />", app);
-        Assert.Contains("<Routes @rendermode=\"InteractiveServer\" />", app);
+        Assert.Contains("<HeadOutlet @rendermode=\"PageRenderMode\" />", app);
+        Assert.Contains("<Routes @rendermode=\"PageRenderMode\" />", app);
+        Assert.Contains("HttpContext.AcceptsInteractiveRouting()", app);
+        Assert.Contains("? InteractiveServer", app);
+        Assert.Contains(": null", app);
+        Assert.DoesNotContain("<HeadOutlet @rendermode=\"InteractiveServer\" />", app);
+        Assert.DoesNotContain("<Routes @rendermode=\"InteractiveServer\" />", app);
         Assert.Contains("<CascadingAuthenticationState>", routes);
         Assert.Contains("@attribute [ExcludeFromInteractiveRouting]", accountImports);
         Assert.Contains(".AddInteractiveServerComponents()", program);
         Assert.Contains(".AddInteractiveServerRenderMode()", program);
+    }
+
+    [Theory]
+    [InlineData("Account/Pages/Login.razor", "@page \"/Account/Login\"")]
+    [InlineData("Account/Pages/Register.razor", "@page \"/Account/Register\"")]
+    [InlineData("Account/Pages/ForgotPassword.razor", "@page \"/Account/ForgotPassword\"")]
+    [InlineData("Account/Pages/ResendEmailConfirmation.razor", "@page \"/Account/ResendEmailConfirmation\"")]
+    [InlineData("Account/Pages/Manage/Index.razor", "@page \"/Account/Manage\"")]
+    public void IdentityRoutes_RemainDiscoverableForStaticSsr(string componentPath, string route)
+    {
+        var source = ReadComponent(componentPath);
+
+        Assert.Contains(route, source);
     }
 
     [Fact]
