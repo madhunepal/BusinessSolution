@@ -113,10 +113,6 @@
             Logger.LogWarning("User account locked out.");
             RedirectManager.RedirectTo("Account/Lockout");
         }
-        else if (result.IsNotAllowed)
-        {
-            errorMessage = "Error: You must confirm your email before logging in. Use the resend confirmation link if you need a new email.";
-        }
         else
         {
             var user = await UserManager.FindByEmailAsync(Input.Email);

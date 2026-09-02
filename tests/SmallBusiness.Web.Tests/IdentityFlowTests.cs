@@ -41,7 +41,7 @@ public class IdentityFlowTests
     }
 
     [Fact]
-    public async Task UnconfirmedAccount_CannotSignInWhenConfirmationIsRequired()
+    public async Task UnconfirmedAccount_CanSignInWhenConfirmationIsOptional()
     {
         await using var provider = CreateIdentityProvider();
         var userManager = provider.GetRequiredService<UserManager<ApplicationUser>>();
@@ -50,7 +50,8 @@ public class IdentityFlowTests
 
         var result = await signInManager.CheckPasswordSignInAsync(user, "Password1", lockoutOnFailure: false);
 
-        Assert.True(result.IsNotAllowed);
+        Assert.True(result.Succeeded);
+        Assert.False(user.EmailConfirmed);
     }
 
     [Fact]
@@ -117,8 +118,9 @@ public class IdentityFlowTests
         var page = ReadComponent("Account/Pages/ForgotPassword.razor");
 
         Assert.Null(await userManager.FindByEmailAsync("missing@example.test"));
-        Assert.Contains("user is null || !(await UserManager.IsEmailConfirmedAsync(user))", page);
-        Assert.Contains("Don't reveal that the user does not exist or is not confirmed", page);
+        Assert.Contains("user is null", page);
+        Assert.DoesNotContain("UserManager.IsEmailConfirmedAsync(user)", page);
+        Assert.Contains("Don't reveal that the user does not exist", page);
         Assert.Contains("RedirectManager.RedirectTo(\"Account/ForgotPasswordConfirmation\")", page);
     }
 
@@ -137,13 +139,37 @@ public class IdentityFlowTests
     }
 
     [Fact]
-    public void Register_DoesNotAutomaticallySignInBeforeEmailConfirmation()
+    public void Register_SignsInAfterBestEffortConfirmationEmail()
     {
         var source = ReadComponent("Account/Pages/Register.razor");
 
-        Assert.DoesNotContain("SignInManager.SignInAsync", source);
+        Assert.Contains("SignInManager.SignInAsync", source);
         Assert.Contains("EmailSender.SendConfirmationLinkAsync", source);
-        Assert.Contains("Account/RegisterConfirmation", source);
+        Assert.Contains("Confirmation email could not be sent", source);
+        Assert.DoesNotContain("Your account was created, but the confirmation email could not be sent", source);
+        Assert.Contains("RedirectManager.RedirectTo(\"/onboarding/business\")", source);
+    }
+
+    [Fact]
+    public void Register_DuplicateEmailUsesFriendlyMessage()
+    {
+        var source = ReadComponent("Account/Pages/Register.razor");
+
+        Assert.Contains("An account with this email already exists. Try logging in or reset your password.", source);
+        Assert.Contains("HasDuplicateEmailError", source);
+        Assert.DoesNotContain("Username '{0}' is already taken", source);
+        Assert.DoesNotContain("Email '{0}' is already taken", source);
+    }
+
+    [Fact]
+    public void Login_DoesNotBlockUnconfirmedUsers()
+    {
+        var source = ReadComponent("Account/Pages/Login.razor");
+        var infrastructure = ReadFile("src", "SmallBusiness.Infrastructure", "DependencyInjection.cs");
+
+        Assert.Contains("options.SignIn.RequireConfirmedAccount = false", infrastructure);
+        Assert.DoesNotContain("You must confirm your email before logging in", source);
+        Assert.Contains("PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe", source);
     }
 
     [Fact]
@@ -187,7 +213,7 @@ public class IdentityFlowTests
     }
 
     [Fact]
-    public void Program_RegistersConfigurableEmailSenderAndRequiresConfirmedAccounts()
+    public void Program_RegistersConfigurableEmailSenderAndKeepsConfirmationOptional()
     {
         var program = ReadFile("src", "SmallBusiness.Web", "Program.cs");
         var infrastructure = ReadFile("src", "SmallBusiness.Infrastructure", "DependencyInjection.cs");
@@ -195,10 +221,28 @@ public class IdentityFlowTests
 
         Assert.Contains("AddHttpClient<IEmailSender<ApplicationUser>, IdentityEmailSender>()", program);
         Assert.DoesNotContain("IdentityNoOpEmailSender", program);
-        Assert.Contains("options.SignIn.RequireConfirmedAccount = true", infrastructure);
+        Assert.Contains("options.SignIn.RequireConfirmedAccount = false", infrastructure);
         Assert.Contains("Email:SendGrid:ApiKey", sender);
         Assert.Contains("Email:FromEmail", sender);
         Assert.Contains("Email:DevelopmentMode", sender);
+    }
+
+    [Fact]
+    public void EmailConfirmationEndpoints_RemainAvailable()
+    {
+        Assert.Contains("@page \"/Account/ConfirmEmail\"", ReadComponent("Account/Pages/ConfirmEmail.razor"));
+        Assert.Contains("@page \"/Account/ResendEmailConfirmation\"", ReadComponent("Account/Pages/ResendEmailConfirmation.razor"));
+        Assert.Contains("GenerateEmailConfirmationTokenAsync", ReadComponent("Account/Pages/ResendEmailConfirmation.razor"));
+    }
+
+    [Fact]
+    public void ForgotPassword_DoesNotClaimDeliveryAfterProviderFailure()
+    {
+        var source = ReadComponent("Account/Pages/ForgotPassword.razor");
+
+        Assert.Contains("Password recovery email is temporarily unavailable. Please try again later.", source);
+        Assert.Contains("return;", source);
+        Assert.Contains("RedirectManager.RedirectTo(\"Account/ForgotPasswordConfirmation\")", source);
     }
 
     [Fact]
@@ -261,7 +305,7 @@ public class IdentityFlowTests
                 options.Password.RequireUppercase = true;
                 options.Password.RequireNonAlphanumeric = false;
                 options.User.RequireUniqueEmail = true;
-                options.SignIn.RequireConfirmedAccount = true;
+                options.SignIn.RequireConfirmedAccount = false;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();

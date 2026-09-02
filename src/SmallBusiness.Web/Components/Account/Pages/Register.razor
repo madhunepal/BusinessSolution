@@ -8,6 +8,7 @@
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
 @inject IEmailSender<ApplicationUser> EmailSender
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
@@ -65,7 +66,7 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => identityErrors is null ? null : $"Error: {FormatIdentityErrors(identityErrors)}";
 
     public async Task RegisterUser(EditContext editContext)
     {
@@ -78,7 +79,15 @@
 
         if (!result.Succeeded)
         {
-            identityErrors = result.Errors;
+            identityErrors = HasDuplicateEmailError(result)
+                ?
+                [
+                    new IdentityError
+                    {
+                        Description = "An account with this email already exists. Try logging in or reset your password."
+                    }
+                ]
+                : result.Errors;
             return;
         }
 
@@ -97,21 +106,20 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to send confirmation email for user {UserId}.", userId);
-            identityErrors =
-            [
-                new IdentityError
-                {
-                    Description = "Your account was created, but the confirmation email could not be sent. Please try resending the confirmation email later."
-                }
-            ];
-            return;
+            Logger.LogWarning(ex, "Confirmation email could not be sent for newly registered user {UserId}. Continuing sandbox registration.", userId);
         }
 
-        RedirectManager.RedirectTo(
-            "Account/RegisterConfirmation",
-            new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+        await SignInManager.SignInAsync(user, isPersistent: false);
+        RedirectManager.RedirectTo("/onboarding/business");
     }
+
+    private static bool HasDuplicateEmailError(IdentityResult result) =>
+        result.Errors.Any(error =>
+            string.Equals(error.Code, nameof(IdentityErrorDescriber.DuplicateEmail), StringComparison.Ordinal) ||
+            string.Equals(error.Code, nameof(IdentityErrorDescriber.DuplicateUserName), StringComparison.Ordinal));
+
+    private static string FormatIdentityErrors(IEnumerable<IdentityError> errors) =>
+        string.Join(", ", errors.Select(error => error.Description));
 
     private ApplicationUser CreateUser()
     {
