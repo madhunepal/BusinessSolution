@@ -202,6 +202,22 @@ public class IdentityFlowTests
     }
 
     [Fact]
+    public void IdentityEmailSender_LogsSendGridFailureDiagnosticsWithoutEmailBodyOrSecrets()
+    {
+        var sender = ReadComponent("Account/IdentityEmailSender.cs");
+
+        Assert.Contains("response.Content.ReadAsStringAsync()", sender);
+        Assert.Contains("{StatusCode}", sender);
+        Assert.Contains("{RecipientEmail}", sender);
+        Assert.Contains("{FromEmail}", sender);
+        Assert.Contains("{ResponseBody}", sender);
+        Assert.DoesNotContain("apiKey,", sender);
+        Assert.DoesNotContain("{ApiKey}", sender);
+        Assert.DoesNotContain("Body: {HtmlMessage}", sender);
+        Assert.Contains("Email body omitted to avoid logging confirmation or reset tokens", sender);
+    }
+
+    [Fact]
     public void ExternalLoginPicker_HidesProviderUiWhenNoProvidersAreConfigured()
     {
         var source = ReadComponent("Account/Shared/ExternalLoginPicker.razor");

@@ -50,6 +50,14 @@ internal sealed class IdentityEmailSender(
 
             if (!response.IsSuccessStatusCode)
             {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                logger.LogError(
+                    "SendGrid email delivery failed with HTTP {StatusCode}. Recipient={RecipientEmail}. From={FromEmail}. ResponseBody={ResponseBody}",
+                    (int)response.StatusCode,
+                    toEmail,
+                    fromEmail,
+                    responseBody);
+
                 throw new InvalidOperationException($"SendGrid email delivery failed with HTTP {(int)response.StatusCode}.");
             }
 
@@ -60,10 +68,9 @@ internal sealed class IdentityEmailSender(
             string.Equals(configuration["Email:DevelopmentMode"], "Log", StringComparison.OrdinalIgnoreCase))
         {
             logger.LogInformation(
-                "Development email to {EmailAddress}: {Subject}. Body: {HtmlMessage}",
+                "Development email generated for {EmailAddress}: {Subject}. Email body omitted to avoid logging confirmation or reset tokens.",
                 toEmail,
-                subject,
-                htmlMessage);
+                subject);
             return;
         }
 
