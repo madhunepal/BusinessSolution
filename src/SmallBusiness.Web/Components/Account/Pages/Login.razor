@@ -3,8 +3,12 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using SmallBusiness.Application.Interfaces
 
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject IApplicationDbContextFactory DbContextFactory
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
@@ -56,8 +60,6 @@
     </div>
     <div class="col-lg-4 col-lg-offset-2">
         <section>
-            <h3>Use another service to log in.</h3>
-            <hr />
             <ExternalLoginPicker />
         </section>
     </div>
@@ -98,7 +100,7 @@
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl ?? "/dashboard");
+            RedirectManager.RedirectTo(ReturnUrl ?? await GetDefaultSignedInUrlAsync());
         }
         else if (result.RequiresTwoFactor)
         {
@@ -111,10 +113,42 @@
             Logger.LogWarning("User account locked out.");
             RedirectManager.RedirectTo("Account/Lockout");
         }
+        else if (result.IsNotAllowed)
+        {
+            errorMessage = "Error: You must confirm your email before logging in. Use the resend confirmation link if you need a new email.";
+        }
         else
         {
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            if (user is not null)
+            {
+                Logger.LogWarning(
+                    "Password sign-in failed for existing user {UserId}. EmailConfirmed={EmailConfirmed}, LockoutEnabled={LockoutEnabled}, LockoutEnd={LockoutEnd}, HasPasswordHash={HasPasswordHash}.",
+                    user.Id,
+                    user.EmailConfirmed,
+                    user.LockoutEnabled,
+                    user.LockoutEnd,
+                    !string.IsNullOrEmpty(user.PasswordHash));
+            }
+
             errorMessage = "Error: Invalid login attempt.";
         }
+    }
+
+    private async Task<string> GetDefaultSignedInUrlAsync()
+    {
+        var user = await UserManager.FindByEmailAsync(Input.Email);
+        if (user is null)
+        {
+            return "/dashboard";
+        }
+
+        await using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        var hasBusiness = await dbContext.BusinessUsers
+            .IgnoreQueryFilters()
+            .AnyAsync(bu => bu.UserId == user.Id && bu.IsActive);
+
+        return hasBusiness ? "/dashboard" : "/onboarding/business";
     }
 
     private sealed class InputModel

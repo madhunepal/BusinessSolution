@@ -78,6 +78,8 @@ export ConnectionStrings__DefaultConnection='Server=localhost,1433;Database=Smal
 dotnet run --project src/SmallBusiness.Web
 ```
 
-For Azure Sandbox/App Service, set `ConnectionStrings__DefaultConnection` in App Service configuration to the Azure SQL Database connection string. Set `SqlServer__EnableRetryOnFailure=true` for Azure SQL transient retry handling. Do not store SQL passwords, publish profiles, `.env` files, or Azure connection strings in the repository.
+For Azure Sandbox/App Service, set `ConnectionStrings__DefaultConnection` in App Service configuration to the Azure SQL Database connection string. Set `SqlServer__EnableRetryOnFailure=true` for Azure SQL transient retry handling. Configure email delivery with `Email__SendGrid__ApiKey`, `Email__FromEmail`, and optionally `Email__FromName`. Do not store SQL passwords, email API keys, publish profiles, `.env` files, or Azure connection strings in the repository.
+
+For local development without an email provider, set `Email__DevelopmentMode=Log` to write Identity confirmation and password-reset links to application logs. Sandbox/Production do not use this fallback and require configured email delivery.
 
 Run EF Core migrations as an explicit deployment step, preferably with a migration bundle or manual migration command against the sandbox database. The web app does not run migrations automatically at startup.
